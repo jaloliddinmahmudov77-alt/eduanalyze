@@ -3,15 +3,23 @@ import { ArrowDown, ArrowUp, ListChecks, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { competenceMax, fmtNum, maxTotal } from '../lib/calc';
 import { addCriterion, moveCriterion, removeCriteria, updateCriterion } from '../lib/ops';
-import { COMPETENCES, COMPETENCE_LABEL, type Competence, type Criterion, type ReportData } from '../lib/types';
+import { getCompetences, type Competence, type Criterion, type ReportData } from '../lib/types';
 import { useFeedback } from './feedback';
 import { Button, EmptyState } from './ui';
 
-export const competenceTone: Record<Competence, string> = {
-  bilish: 'bg-sky-50 text-sky-800 ring-sky-200',
-  qollash: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  mulohaza: 'bg-violet-50 text-violet-800 ring-violet-200',
-};
+const TONES = [
+  'bg-sky-50 text-sky-800 ring-sky-200',
+  'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  'bg-violet-50 text-violet-800 ring-violet-200',
+  'bg-amber-50 text-amber-800 ring-amber-200',
+  'bg-rose-50 text-rose-800 ring-rose-200',
+  'bg-teal-50 text-teal-800 ring-teal-200',
+];
+/** Kompetensiya rangi (ro'yxatdagi o'rni bo'yicha); biriktirilmagan — kulrang */
+export function competenceTone(d: ReportData, id: string) {
+  const i = getCompetences(d).findIndex((c) => c.id === id);
+  return i < 0 ? 'bg-slate-50 text-slate-500 ring-slate-200' : TONES[i % TONES.length];
+}
 
 function MaxInput({ c, onCommit }: { c: Criterion; onCommit: (v: number) => boolean }) {
   const [v, setV] = useState(String(c.max));
@@ -35,7 +43,8 @@ function MaxInput({ c, onCommit }: { c: Criterion; onCommit: (v: number) => bool
 
 export function CriteriaEditor({ data, onChange }: { data: ReportData; onChange: (d: ReportData) => void }) {
   const { toast, confirm } = useFeedback();
-  const cm = competenceMax(data.criteria);
+  const comps = getCompetences(data);
+  const cm = competenceMax(data.criteria, comps.map((k) => k.id));
   const tryChange = (fn: () => ReportData) => {
     try { onChange(fn()); return true; } catch (e) { toast((e as Error).message, 'error'); return false; }
   };
@@ -73,11 +82,12 @@ export function CriteriaEditor({ data, onChange }: { data: ReportData; onChange:
                   </td>
                   <td className="px-2 py-2">
                     <select
-                      className={clsx('input h-9 font-medium ring-1 ring-inset', competenceTone[c.type])}
+                      className={clsx('input h-9 font-medium ring-1 ring-inset', competenceTone(data, c.type))}
                       value={c.type}
                       onChange={(e) => tryChange(() => updateCriterion(data, c.id, { type: e.target.value as Competence }))}
                     >
-                      {COMPETENCES.map((k) => <option key={k} value={k}>{COMPETENCE_LABEL[k]}</option>)}
+                      {getCompetences(data).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                      <option value="">— Biriktirilmagan —</option>
                     </select>
                   </td>
                   <td className="px-2 py-2">
@@ -109,9 +119,9 @@ export function CriteriaEditor({ data, onChange }: { data: ReportData; onChange:
         )}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-lg bg-navy-900 px-3 py-1.5 font-medium text-white">Umumiy maksimal ball: {fmtNum(maxTotal(data.criteria))}</span>
-          {COMPETENCES.map((k) => (
-            <span key={k} className={clsx('rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 ring-inset', competenceTone[k])}>
-              {COMPETENCE_LABEL[k]}: {fmtNum(cm[k])}
+          {comps.map((k) => (
+            <span key={k.id} className={clsx('rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 ring-inset', competenceTone(data, k.id))}>
+              {k.name}: {fmtNum(cm[k.id])}
             </span>
           ))}
         </div>

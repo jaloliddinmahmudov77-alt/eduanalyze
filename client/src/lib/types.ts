@@ -1,14 +1,29 @@
 export type Role = 'teacher' | 'admin';
-export type Competence = 'bilish' | 'qollash' | 'mulohaza';
+/** Kompetensiya identifikatori (standart: bilish, qollash, mulohaza; foydalanuvchi o'zinikini qo'shishi mumkin). '' — biriktirilmagan */
+export type Competence = string;
 export type ControlType = 'BSB-I' | 'BSB-II' | 'CHSB-I' | 'CHSB-II';
 
 export const CONTROL_TYPES: ControlType[] = ['BSB-I', 'BSB-II', 'CHSB-I', 'CHSB-II'];
 export const COMPETENCES: Competence[] = ['bilish', 'qollash', 'mulohaza'];
-export const COMPETENCE_LABEL: Record<Competence, string> = {
+export const COMPETENCE_LABEL: Record<string, string> = {
   bilish: 'Bilish',
   qollash: 'Qo‘llash',
   mulohaza: 'Mulohaza',
 };
+
+export interface CompetenceDef {
+  id: string;
+  name: string;
+}
+export const DEFAULT_COMPETENCES: CompetenceDef[] = COMPETENCES.map((id) => ({ id, name: COMPETENCE_LABEL[id] }));
+
+/** Hisobotning kompetensiya ustunlari (eski hisobotlarda — standart uchta) */
+export function getCompetences(d: { competences?: CompetenceDef[] }): CompetenceDef[] {
+  return d.competences ?? DEFAULT_COMPETENCES;
+}
+export function competenceName(d: { competences?: CompetenceDef[] }, id: string): string {
+  return getCompetences(d).find((c) => c.id === id)?.name ?? (id ? COMPETENCE_LABEL[id] ?? id : '—');
+}
 
 export interface User {
   id: number;
@@ -36,6 +51,8 @@ export interface Student {
 export interface ReportData {
   criteria: Criterion[];
   students: Student[];
+  /** Kompetensiya ustunlari (Bilish, Qo‘llash, Mulohaza ...). Bo'lmasa — standart uchta */
+  competences?: CompetenceDef[];
 }
 
 export interface ReportMeta {

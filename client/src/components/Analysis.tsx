@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { useMemo } from 'react';
-import { computeClass, computeStudent, fmtNum, fmtPct, gradeOf } from '../lib/calc';
-import { COMPETENCES, COMPETENCE_LABEL, type ReportData } from '../lib/types';
+import { activeCriteria, computeClass, computeStudent, fmtNum, fmtPct, gradeOf } from '../lib/calc';
+import { competenceName, getCompetences, type ReportData } from '../lib/types';
 
 const barColor = (p: number) => (p >= 86 ? 'bg-emerald-500' : p >= 71 ? 'bg-navy-500' : p >= 56 ? 'bg-amber-500' : 'bg-red-500');
 
@@ -22,7 +22,7 @@ function Bar({ label, value, sub }: { label: string; value: number; sub?: string
 export function Analysis({ data }: { data: ReportData }) {
   const cls = useMemo(() => computeClass(data), [data]);
   const ranked = useMemo(
-    () => data.students.map((s) => ({ s, r: computeStudent(data.criteria, s) })).filter((x) => x.r.participated).sort((a, b) => b.r.percent - a.r.percent),
+    () => data.students.map((s) => ({ s, r: computeStudent(activeCriteria(data), s) })).filter((x) => x.r.participated).sort((a, b) => b.r.percent - a.r.percent),
     [data],
   );
   const absent = data.students.length - cls.participants;
@@ -53,14 +53,14 @@ export function Analysis({ data }: { data: ReportData }) {
         <div className="rounded-xl border border-slate-200 p-5">
           <h3 className="mb-4 text-sm font-semibold text-slate-900">Kompetensiyalar bo‘yicha</h3>
           <div className="space-y-4">
-            {COMPETENCES.map((k) => (
-              <Bar key={k} label={COMPETENCE_LABEL[k]} value={cls.compPercent[k]} sub={cls.compMax[k] ? `${fmtNum(cls.compSum[k])}/${fmtNum(cls.compClassMax[k])}` : 'mezon yo‘q'} />
+            {getCompetences(data).map(({ id: k, name }) => (
+              <Bar key={k} label={name} value={cls.compPercent[k] ?? 0} sub={cls.compMax[k] ? `${fmtNum(cls.compSum[k])}/${fmtNum(cls.compClassMax[k])}` : 'mezon yo‘q'} />
             ))}
           </div>
           <h3 className="mb-4 mt-7 text-sm font-semibold text-slate-900">Mezonlar bo‘yicha</h3>
           <div className="space-y-4">
             {data.criteria.map((c) => (
-              <Bar key={c.id} label={`${c.name} · ${COMPETENCE_LABEL[c.type]}`} value={cls.criterionPercent[c.id]} sub={`${fmtNum(cls.criterionSum[c.id])}/${fmtNum(cls.criterionMax[c.id])}`} />
+              <Bar key={c.id} label={`${c.name} · ${competenceName(data, c.type)}`} value={cls.criterionPercent[c.id]} sub={`${fmtNum(cls.criterionSum[c.id])}/${fmtNum(cls.criterionMax[c.id])}`} />
             ))}
           </div>
         </div>

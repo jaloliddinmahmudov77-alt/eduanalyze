@@ -2,11 +2,11 @@
 import ExcelJS from 'exceljs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { computeClass, computeStudent, parseScore, validateScore } from '../client/src/lib/calc';
+import { activeCriteria, computeClass, computeStudent, parseScore, validateScore } from '../client/src/lib/calc';
 import { buildReportWorkbook, colLetter, parseReportXlsx } from '../client/src/lib/excel';
 import { extractNames, namesFromText } from '../client/src/lib/importStudents';
-import { updateCriterion } from '../client/src/lib/ops';
-import type { ReportData, ReportMeta } from '../client/src/lib/types';
+import { addCompetence, removeCompetence, renameCompetence, updateCriterion } from '../client/src/lib/ops';
+import { getCompetences, type ReportData, type ReportMeta } from '../client/src/lib/types';
 
 let fails = 0;
 let passes = 0;
@@ -40,26 +40,26 @@ console.log('1) Hisob-kitoblar');
 {
   const d = computeStudent(data.criteria, data.students[3]);
   near(d.total, 31.5, 'D total');
-  near(d.percent, (31.5 / 44) * 100, 'D % (bo‘sh Writing hisobga kirmaydi)');
+  near(d.percent, 63, 'D % = 31.5 / 50 (bo‘sh katak 0)');
   near(d.comp.bilish, (11.5 / 16) * 100, 'D bilish');
   near(d.comp.qollash, (20 / 28) * 100, 'D qollash');
   near(d.comp.mulohaza, 0, 'D mulohaza');
   ok(!computeStudent(data.criteria, data.students[2]).participated, 'bo‘sh o‘quvchi qatnashmagan');
-  ok(computeStudent(data.criteria, data.students[4]).participated, 'nol ballik o‘quvchi qatnashgan');
+  ok(!computeStudent(data.criteria, data.students[4]).participated, 'bali 0 o‘quvchi sinf natijasiga kirmaydi (Excel: COUNTIF(jami,">0"))');
   const c = computeClass(data);
-  ok(c.participants === 4, 'qatnashganlar 4');
+  ok(c.participants === 3, 'ball olganlar 3');
   near(c.totalSum, 106.5, 'sinf jami');
-  near(c.totalMax, 194, 'sinf max');
-  near(c.percent, (106.5 / 194) * 100, 'sinf %');
-  near(c.criterionPercent.L, (13.5 / 24) * 100, 'Listening %');
-  near(c.compPercent.bilish, ((13.5 + 22) / 64) * 100, 'Bilish sinf %');
-  near(c.compPercent.mulohaza, (9 / 18) * 100, 'Mulohaza sinf % (3 ta baholangan)');
-  near(c.criterionPercent.W, 50, 'Writing % faqat baholanganlar bo‘yicha');
+  near(c.totalMax, 150, 'sinf max');
+  near(c.percent, 71, 'sinf % = 106.5 / (50×3)');
+  near(c.criterionPercent.L, 75, 'Listening % = 13.5 / (6×3)');
+  near(c.compPercent.bilish, ((13.5 + 22) / 48) * 100, 'Bilish sinf %');
+  near(c.compPercent.mulohaza, 50, 'Mulohaza sinf %');
+  near(c.criterionPercent.W, 50, 'Writing % = 9 / (6×3)');
   // Regressiya: 2 mezon (6 va 10), o'quvchi faqat birinchisidan 5 ball olgan → 5/6, 5/16 emas
   const reg = { criteria: [{ id: 'A', name: 'Bilish', max: 6, type: 'bilish' as const }, { id: 'B', name: 'Mezon 2', max: 10, type: 'bilish' as const }],
     students: [{ id: 'x', name: 'Ali', scores: { A: 5 } }, { id: 'y', name: 'Vali', scores: { A: 6 } }] };
-  near(computeStudent(reg.criteria, reg.students[0]).percent, (5 / 6) * 100, 'regressiya: 5/6 = 83%');
-  near(computeStudent(reg.criteria, reg.students[0]).comp.bilish, (5 / 6) * 100, 'regressiya: Bilish 83%');
+  near(computeStudent(activeCriteria(reg), reg.students[0]).percent, (5 / 6) * 100, 'regressiya: 5/6 = 83%');
+  near(computeStudent(activeCriteria(reg), reg.students[0]).comp.bilish, (5 / 6) * 100, 'regressiya: Bilish 83%');
   near(computeClass(reg).percent, (11 / 12) * 100, 'regressiya: sinf 11/12');
   near(computeClass(reg).criterionPercent.B, 0, 'regressiya: baholanmagan mezon 0%');
   near(computeStudent(reg.criteria, { id: 'z', name: 'z', scores: { A: 5, B: 0 } }).percent, (5 / 16) * 100, 'nol ball hisobga kiradi');
@@ -74,6 +74,28 @@ console.log('1) Hisob-kitoblar');
   ok(threw, 'max balli mavjud balldan kichik qilib bo‘lmaydi');
   const full = { ...data, students: [{ id: 'x', name: 'x', scores: { L: 6, R: 28, W: 6, G: 10 } }] };
   ok(computeClass(full).percent <= 100, 'foiz 100 dan oshmaydi');
+}
+
+{
+  // Kompetensiya ustunlarini tahrirlash: nomini o'zgartirish, qo'shish, o'chirish
+  let d: ReportData = renameCompetence(data, 'mulohaza', 'Ijodiy fikrlash');
+  d = addCompetence(d, 'Tahlil');
+  const tahlil = getCompetences(d).find((k) => k.name === 'Tahlil')!;
+  d = updateCriterion(d, 'G', { type: tahlil.id });
+  let cc = computeClass(d);
+  ok(getCompetences(d).map((k) => k.name).join() === 'Bilish,Qo‘llash,Ijodiy fikrlash,Tahlil', 'kompetensiya nomi o‘zgardi va yangisi qo‘shildi');
+  near(cc.compPercent[tahlil.id], (22 / 30) * 100, 'yangi kompetensiya foizi (Grammar 22/(10×3))');
+  near(cc.compPercent.bilish, 75, 'Bilish faqat Listening bilan');
+  d = removeCompetence(d, 'qollash');
+  cc = computeClass(d);
+  ok(!getCompetences(d).some((k) => k.id === 'qollash') && d.criteria.find((c) => c.id === 'R')!.type === '', 'kompetensiya o‘chirildi, mezoni biriktirilmagan bo‘ldi');
+  near(cc.percent, 71, 'umumiy foiz o‘zgarmadi');
+  const wb2 = await buildReportWorkbook(meta, d);
+  const ws2 = wb2.worksheets[0];
+  ok([9, 10, 11].map((c) => ws2.getCell(6, c).value).join() === 'Bilish,Ijodiy fikrlash,Tahlil' && !ws2.getCell(6, 12).value, 'Excel’da kompetensiya ustunlari yangilandi');
+  const back = await parseReportXlsx((await wb2.xlsx.writeBuffer()) as ArrayBuffer);
+  ok(getCompetences(back.data).map((k) => k.name).join() === 'Bilish,Ijodiy fikrlash,Tahlil', 'qayta yuklashda kompetensiyalar tiklandi');
+  ok(back.data.criteria.find((c) => c.name === 'Grammar')!.type === tahlil.id && back.data.criteria.find((c) => c.name === 'Reading')!.type === '', 'qayta yuklashda mezon kompetensiyalari saqlandi');
 }
 
 console.log('2) Excel eksport');
@@ -101,6 +123,7 @@ ok(ws.getCell(ds, 2).alignment?.horizontal === 'left' && ws.getCell(ds, 8).align
 ok(ws.getCell(jr, 3).font?.bold && ws.getCell(fr, 3).font?.bold, 'Jami va Foiz qalin');
 ok(ws.getCell(ds, 8).numFmt === '0%' && ws.getCell(fr, 3).numFmt === '0%', 'foiz formati');
 ok(typeof (ws.getCell(ds, 7).value as { formula?: string }).formula === 'string', 'formula mavjud');
+ok((ws.getCell(ds, 8).value as { formula?: string }).formula === `G${ds}/G$${hr}`, `foiz formulasi oddiy: ball / max — ${(ws.getCell(ds, 8).value as { formula?: string }).formula}`);
 ok(wb.getWorksheet('EduAnalyze')?.state === 'veryHidden', 'yashirin meta varaq');
 
 console.log('3) Qayta import');
@@ -111,7 +134,7 @@ ok(parsed.data.criteria[1].max === 28, 'max');
 ok(parsed.data.students.length === 5, `o‘quvchilar soni ${parsed.data.students.length}`);
 ok(parsed.data.students[3].scores.L === 4.5 && parsed.data.students[3].scores.W === undefined, 'ballar');
 ok(parsed.meta.className === '6-A' && parsed.meta.subject === 'Ingliz tili' && parsed.meta.controlType === 'CHSB-I', 'meta');
-near(computeClass(parsed.data).percent, (106.5 / 194) * 100, 'importdan keyin sinf %');
+near(computeClass(parsed.data).percent, 71, 'importdan keyin sinf %');
 {
   // O'qituvchining o'z namunasi kabi fayl (yashirin varaqsiz, izohsiz) — qayta yuklash
   const w2 = new ExcelJS.Workbook();
@@ -151,8 +174,8 @@ const expect: Record<string, number | string> = {
   [`${T}${hr}`]: 50,
   [`${T}${ds}`]: 50, [`${P}${ds}`]: 1,
   [`${T}${ds + 1}`]: 25, [`${P}${ds + 1}`]: 0.5,
-  [`${T}${ds + 2}`]: '', [`${P}${ds + 2}`]: '',
-  [`${T}${ds + 3}`]: 31.5, [`${P}${ds + 3}`]: 31.5 / 44, [`${B}${ds + 3}`]: res[3].comp.bilish / 100,
+  [`${T}${ds + 2}`]: 0, [`${P}${ds + 2}`]: 0,
+  [`${T}${ds + 3}`]: 31.5, [`${P}${ds + 3}`]: 0.63, [`${B}${ds + 3}`]: res[3].comp.bilish / 100,
   [`${Q}${ds + 3}`]: res[3].comp.qollash / 100, [`${M}${ds + 3}`]: 0,
   [`${T}${ds + 4}`]: 0,
   [`C${jr}`]: 13.5, [`${T}${jr}`]: 106.5, [`${B}${jr}`]: 35.5, [`${M}${jr}`]: 9,
@@ -166,7 +189,7 @@ const c2 = computeClass(d2);
 const mutate = {
   set: { [`D${ds + 1}`]: 28, [`C${ds + 2}`]: 6 },
   expect: {
-    [`${T}${ds + 1}`]: 39, [`${P}${ds + 1}`]: 0.78, [`${T}${ds + 2}`]: 6, [`${P}${ds + 2}`]: 1,
+    [`${T}${ds + 1}`]: 39, [`${P}${ds + 1}`]: 0.78, [`${T}${ds + 2}`]: 6, [`${P}${ds + 2}`]: 0.12,
     [`${T}${jr}`]: c2.totalSum, [`${T}${fr}`]: c2.percent / 100, [`${Q}${fr}`]: c2.compPercent.qollash / 100,
   },
 };

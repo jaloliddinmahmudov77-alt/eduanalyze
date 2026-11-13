@@ -1,12 +1,14 @@
 import clsx from 'clsx';
 import {
-  ArrowLeftToLine, ArrowRightToLine, ClipboardCopy, ClipboardPaste, Columns3, Eraser, MoreVertical, Redo2,
+  ArrowLeftToLine, ArrowRightToLine, ClipboardCopy, ClipboardPaste, Columns3, Eraser, MoreVertical, Plus, Redo2,
   Rows3, Trash2, Undo2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { computeClass, computeStudent, fmtNum, fmtPct, isScore, parseScore, validateScore } from '../lib/calc';
-import { addCriterion, addStudents, moveCriterion, removeCriteria, removeStudents, updateCriterion } from '../lib/ops';
-import { COMPETENCES, COMPETENCE_LABEL, type Competence, type Criterion, type ReportData } from '../lib/types';
+import { activeCriteria, computeClass, computeStudent, fmtNum, fmtPct, isScore, parseScore, validateScore } from '../lib/calc';
+import {
+  addCompetence, addCriterion, addStudents, moveCompetence, moveCriterion, removeCompetence, removeCriteria, removeStudents, renameCompetence, updateCriterion,
+} from '../lib/ops';
+import { getCompetences, type Competence, type Criterion, type ReportData } from '../lib/types';
 import { competenceTone } from './CriteriaEditor';
 import { useFeedback } from './feedback';
 
@@ -43,19 +45,21 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
   const [errorCell, setErrorCell] = useState<Pos | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [compMenu, setCompMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const dragging = useRef(false);
 
   const { criteria, students } = data;
+  const comps = getCompetences(data);
   const cols: Col[] = useMemo(
     () => [
       { kind: 'idx' }, { kind: 'name' },
       ...criteria.map((crit) => ({ kind: 'crit' as const, crit })),
       { kind: 'calc', calc: 'total' }, { kind: 'calc', calc: 'percent' },
-      ...COMPETENCES.map((k) => ({ kind: 'calc' as const, calc: k })),
+      ...comps.map((k) => ({ kind: 'calc' as const, calc: k.id })),
     ],
-    [criteria],
+    [criteria, comps],
   );
-  const results = useMemo(() => students.map((s) => computeStudent(criteria, s)), [students, criteria]);
+  const results = useMemo(() => { const act = activeCriteria(data); const ids = getCompetences(data).map((k) => k.id); return students.map((s) => computeStudent(act, s, ids)); }, [data, students]);
   const cls = useMemo(() => computeClass(data), [data]);
   const rowCount = students.length;
   const colCount = cols.length;
@@ -94,7 +98,7 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
     if (!res.participated) return '';
     if (col.calc === 'total') return fmtNum(res.total);
     if (col.calc === 'percent') return fmtPct(res.percent);
-    return fmtPct(res.comp[col.calc]);
+    return fmtPct(res.comp[col.calc] ?? 0);
   };
 
   /** Bitta katak qiymatini qo'llash (validatsiya bilan). Xato bo'lsa — matn qaytaradi */
@@ -248,7 +252,7 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
 
   useEffect(() => {
     const up = () => (dragging.current = false);
-    const close = () => { setMenu(null); setColMenu(null); };
+    const close = () => { setMenu(null); setColMenu(null); setCompMenu(null); };
     window.addEventListener('mouseup', up);
     window.addEventListener('scroll', close, true);
     return () => { window.removeEventListener('mouseup', up); window.removeEventListener('scroll', close, true); };
@@ -351,13 +355,11 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
   const stickyLeft = (c: number) =>
     c === 0 ? { position: 'sticky' as const, left: 0, zIndex: 2 } : c === 1 ? { position: 'sticky' as const, left: IDX_W, zIndex: 2 } : undefined;
 
-  const calcHeader = (k: 'total' | 'percent' | Competence) =>
-    k === 'total' ? 'Umumiy ball' : k === 'percent' ? 'Foiz %' : COMPETENCE_LABEL[k];
 
   const menuItem = (icon: ReactNode, label: string, fn: () => void, danger?: boolean, disabled?: boolean) => (
     <button
       disabled={disabled}
-      onClick={() => { setMenu(null); setColMenu(null); fn(); }}
+      onClick={() => { setMenu(null); setColMenu(null); setCompMenu(null); fn(); }}
       className={clsx('flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent', danger ? 'text-red-600' : 'text-slate-700')}
     >
       {icon}{label}
@@ -379,6 +381,7 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
         <span className="mx-1 h-5 w-px bg-slate-200" />
         <button className={tb} onClick={() => insertCol(true)} title="Baholash ustuni qo‘shish"><Columns3 className="size-4" /><span className="hidden sm:inline">+ Ustun</span></button>
         <button className={tb} onClick={() => deleteCols()} disabled={!hasCritSel} title="Tanlangan ustunni o‘chirish"><Trash2 className="size-4" /><span className="hidden sm:inline">Ustun</span></button>
+        <button className={tb} onClick={() => onChange(addCompetence(data))} title="Kompetensiya ustuni qo‘shish (Bilish, Qo‘llash, Mulohaza kabi)"><Plus className="size-4" /><span className="hidden sm:inline">Kompetensiya</span></button>
         <span className="mx-1 h-5 w-px bg-slate-200" />
         <button className={tb} onClick={copyToClipboard} disabled={!rowCount} title="Nusxalash (Ctrl+C)"><ClipboardCopy className="size-4" /></button>
         <button className={tb} onClick={pasteFromClipboard} disabled={!rowCount} title="Joylashtirish (Ctrl+V)"><ClipboardPaste className="size-4" /></button>
@@ -406,7 +409,7 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
         className="relative min-h-[320px] flex-1 overflow-auto bg-white outline-none focus-visible:ring-0"
         style={{ maxHeight: 'calc(100vh - 230px)' }}
         onContextMenu={(e) => { e.preventDefault(); setColMenu(null); setMenu({ x: e.clientX, y: e.clientY }); }}
-        onMouseDown={() => { setMenu(null); setColMenu(null); }}
+        onMouseDown={() => { setMenu(null); setColMenu(null); setCompMenu(null); }}
       >
         <table className="grid-table select-none text-[13px]" style={{ minWidth: '100%' }}>
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-700">
@@ -433,20 +436,42 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
                   </div>
                 </th>
               ))}
-              {(['total', 'percent', ...COMPETENCES] as const).map((k) => (
-                <th key={k} rowSpan={2} className="min-w-[92px] bg-slate-200/70 px-2 text-xs font-semibold">{calcHeader(k)}</th>
+              <th rowSpan={2} className="min-w-[92px] bg-slate-200/70 px-2 text-xs font-semibold">Umumiy ball</th>
+              <th rowSpan={2} className="min-w-[92px] bg-slate-200/70 px-2 text-xs font-semibold">Foiz %</th>
+              {comps.map((k) => (
+                <th key={k.id} rowSpan={2} className="min-w-[104px] bg-slate-200/70 p-0">
+                  <div className="flex items-center">
+                    <input
+                      className="h-8 w-full min-w-0 bg-transparent px-2 text-center text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none"
+                      value={k.name}
+                      onChange={(e) => onChange(renameCompetence(data, k.id, e.target.value), `comp-${k.id}`)}
+                      onBlur={(e) => { if (!e.target.value.trim()) onChange(renameCompetence(data, k.id, 'Kompetensiya')); }}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget.blur(), focusGrid())}
+                      aria-label="Kompetensiya nomi"
+                      title="Nomini o‘zgartirish uchun bosing"
+                    />
+                    <button
+                      className="mr-0.5 rounded p-0.5 text-slate-500 hover:bg-slate-300 hover:text-slate-800"
+                      onClick={(e) => { const b = (e.currentTarget as HTMLElement).getBoundingClientRect(); setMenu(null); setColMenu(null); setCompMenu({ id: k.id, x: b.left, y: b.bottom + 4 }); }}
+                      aria-label="Kompetensiya amallari"
+                    >
+                      <MoreVertical className="size-3.5" />
+                    </button>
+                  </div>
+                </th>
               ))}
             </tr>
             <tr>
               {criteria.map((c) => (
                 <th key={c.id} className="bg-amber-100 p-0.5">
                   <select
-                    className={clsx('h-7 w-full rounded px-1 text-center text-[11px] font-medium ring-1 ring-inset focus:outline-none', competenceTone[c.type])}
+                    className={clsx('h-7 w-full rounded px-1 text-center text-[11px] font-medium ring-1 ring-inset focus:outline-none', competenceTone(data, c.type))}
                     value={c.type}
                     onChange={(e) => tryCrit(() => updateCriterion(data, c.id, { type: e.target.value as Competence }))}
                     aria-label="Kompetensiya"
                   >
-                    {COMPETENCES.map((k) => <option key={k} value={k}>{COMPETENCE_LABEL[k]}</option>)}
+                    {comps.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                    <option value="">— Biriktirilmagan —</option>
                   </select>
                 </th>
               ))}
@@ -459,7 +484,7 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
               ))}
               <th className="bg-slate-200/70 px-2 text-xs font-semibold tabular-nums">{fmtNum(cls.maxTotal)}</th>
               <th className="bg-slate-200/70 px-2 text-xs font-semibold">100%</th>
-              {COMPETENCES.map((k) => <th key={k} className="bg-slate-200/70 px-2 text-xs font-semibold tabular-nums">{fmtNum(cls.compMax[k])}</th>)}
+              {comps.map((k) => <th key={k.id} className="bg-slate-200/70 px-2 text-xs font-semibold tabular-nums">{fmtNum(cls.compMax[k.id] ?? 0)}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -537,16 +562,16 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
           </tbody>
           <tfoot className="sticky bottom-0 z-10 text-slate-800">
             {([
-              ['Jami', (id: string) => fmtNum(cls.criterionSum[id]), fmtNum(cls.totalSum), '', (k: Competence) => fmtNum(cls.compSum[k]), true],
-              ['Maksimal ball', (id: string) => fmtNum(cls.criterionMax[id]), fmtNum(cls.totalMax), '', (k: Competence) => fmtNum(cls.compClassMax[k]), false],
-              ['Foiz', (id: string) => fmtPct(cls.criterionPercent[id]), fmtPct(cls.percent), fmtPct(cls.percent), (k: Competence) => fmtPct(cls.compPercent[k]), true],
+              ['Jami', (id: string) => fmtNum(cls.criterionSum[id]), fmtNum(cls.totalSum), '', (k: Competence) => fmtNum(cls.compSum[k] ?? 0), true],
+              ['Maksimal ball', (id: string) => fmtNum(cls.criterionMax[id]), fmtNum(cls.totalMax), '', (k: Competence) => fmtNum(cls.compClassMax[k] ?? 0), false],
+              ['Foiz', (id: string) => fmtPct(cls.criterionPercent[id]), fmtPct(cls.percent), fmtPct(cls.percent), (k: Competence) => fmtPct(cls.compPercent[k] ?? 0), true],
             ] as const).map(([label, crit, total, percent, comp, bold]) => (
               <tr key={label} className={clsx(bold ? 'font-semibold' : 'text-slate-600')}>
                 <td colSpan={2} style={{ position: 'sticky', left: 0, zIndex: 2 }} className="h-8 bg-slate-100 px-3 text-left">{label}</td>
                 {criteria.map((c) => <td key={c.id} className="bg-slate-100 px-2 text-center tabular-nums">{crit(c.id)}</td>)}
                 <td className="bg-slate-200/70 px-2 text-center tabular-nums">{total}</td>
                 <td className="bg-slate-200/70 px-2 text-center tabular-nums">{percent}</td>
-                {COMPETENCES.map((k) => <td key={k} className="bg-slate-200/70 px-2 text-center tabular-nums">{comp(k)}</td>)}
+                {comps.map((k) => <td key={k.id} className="bg-slate-200/70 px-2 text-center tabular-nums">{comp(k.id)}</td>)}
               </tr>
             ))}
           </tfoot>
@@ -576,6 +601,23 @@ export function Grid({ data, onChange, onUndo, onRedo, canUndo, canRedo, toolbar
           {menuItem(<Trash2 className="size-4" />, 'Ustunni o‘chirish', () => deleteCols(), true, !hasCritSel)}
         </div>
       )}
+      {compMenu && (() => {
+        const idx = comps.findIndex((k) => k.id === compMenu.id);
+        const used = criteria.filter((c) => c.type === compMenu.id).length;
+        return (
+          <div className="fixed z-50 w-60 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl" style={{ left: Math.min(compMenu.x, window.innerWidth - 250), top: compMenu.y }} onMouseDown={(e) => e.stopPropagation()}>
+            {menuItem(<ArrowLeftToLine className="size-4" />, 'Chapga kompetensiya qo‘shish', () => onChange(addCompetence(data, 'Yangi kompetensiya', idx)))}
+            {menuItem(<ArrowRightToLine className="size-4" />, 'O‘ngga kompetensiya qo‘shish', () => onChange(addCompetence(data, 'Yangi kompetensiya', idx + 1)))}
+            {menuItem(<ArrowLeftToLine className="size-4" />, 'Chapga surish', () => onChange(moveCompetence(data, compMenu.id, -1)), false, idx === 0)}
+            {menuItem(<ArrowRightToLine className="size-4" />, 'O‘ngga surish', () => onChange(moveCompetence(data, compMenu.id, 1)), false, idx === comps.length - 1)}
+            <div className="my-1 h-px bg-slate-100" />
+            {menuItem(<Trash2 className="size-4" />, 'Kompetensiyani o‘chirish', () => {
+              onChange(removeCompetence(data, compMenu.id));
+              toast(used ? `O‘chirildi. ${used} ta mezon endi biriktirilmagan (Ctrl+Z — qaytarish)` : 'Kompetensiya o‘chirildi (Ctrl+Z — qaytarish)', 'info');
+            }, true)}
+          </div>
+        );
+      })()}
       {colMenu && (
         <div className="fixed z-50 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl" style={{ left: Math.min(colMenu.x, window.innerWidth - 240), top: colMenu.y }} onMouseDown={(e) => e.stopPropagation()}>
           {menuItem(<ArrowLeftToLine className="size-4" />, 'Chapga ustun qo‘shish', () => insertCol(false, colMenu.id))}

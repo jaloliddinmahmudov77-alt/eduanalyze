@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
-import { computeClass, computeStudent, isScore, maxTotal, uid, validateScore } from './calc';
+import { activeCriteria, computeClass, computeStudent, isScore, uid, validateScore } from './calc';
 import {
-  COMPETENCES, COMPETENCE_LABEL, CONTROL_TYPES, type Competence, type ControlType, type Criterion,
+  CONTROL_TYPES, competenceName, getCompetences, type Competence, type CompetenceDef, type ControlType, type Criterion,
   type ReportData, type ReportMeta, type Student,
 } from './types';
 
@@ -84,8 +84,11 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
   const CN = C1 + n - 1;
   const colT = CN + 1; // jami (sarlavhada umumiy maksimal ball)
   const colP = CN + 2; // Foiz %
-  const colComp: Record<Competence, number> = { bilish: CN + 3, qollash: CN + 4, mulohaza: CN + 5 };
-  const lastCol = CN + 5;
+  // kompetensiya ustunlari hisobotdagi ro'yxatdan (Bilish, Qo'llash, Mulohaza yoki foydalanuvchi o'zgartirgan)
+  const compDefs = getCompetences(data);
+  const compIds = compDefs.map((k) => k.id);
+  const colComp: Record<string, number> = Object.fromEntries(compDefs.map((k, i) => [k.id, CN + 3 + i]));
+  const lastCol = CN + 2 + compDefs.length;
   const L = colLetter;
   const T = L(colT);
 
@@ -96,13 +99,16 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
   const fr = de + 2; // Foizi %
 
   const cls = computeClass(data);
-  const mt = maxTotal(criteria);
-  const compCols = (k: Competence) => criteria.map((c, i) => (c.type === k ? C1 + i : 0)).filter(Boolean);
-  const allCols = criteria.map((_c, i) => C1 + i);
-  // Bo'sh katak = baholanmagan: maksimal ballga faqat ball kiritilgan mezonlar qo'shiladi
-  const rowMaxExpr = (cols: number[], row: number) => cols.map((x) => `IF(${L(x)}${row}="",0,${L(x)}$${hr})`).join('+');
-  // Sinf bo'yicha: har mezon maks. bali x shu mezon bo'yicha baholanganlar soni
-  const classMaxExpr = (cols: number[]) => cols.map((x) => `${L(x)}$${hr}*COUNT(${L(x)}${ds}:${L(x)}${de})`).join('+');
+  // Faol mezonlar: kamida bitta ball qo'yilgan (bo'sh, to'ldirilmagan ustun maksimal ballga qo'shilmaydi)
+  const active = activeCriteria(data);
+  const activeIds = new Set(active.map((c) => c.id));
+  const colOf = (c: Criterion) => C1 + criteria.indexOf(c);
+  const activeCols = active.map(colOf);
+  const compCols = (k: Competence) => active.filter((c) => c.type === k).map(colOf);
+  const sumCells = (cols: number[], row: string | number) => cols.map((x) => `${L(x)}${row}`).join('+');
+  const cnt = `COUNTIF($${T}$${ds}:$${T}$${de},">0")`; // ball olgan o'quvchilar soni
+  // bitta katak bo'lsa qavssiz: E7/E$6; bir nechta bo'lsa: (C7+E7)/(C$6+E$6)
+  const grp = (expr: string) => (expr.includes('+') ? `(${expr})` : expr);
 
   // --- Sarlavha bloki (kulrang) ---
   const lines = titleLines(meta);
@@ -120,17 +126,20 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
   criteria.forEach((c, i) => {
     const cell = ws.getCell(hr, C1 + i);
     cell.value = c.max;
-    cell.note = `${c.name} — ${COMPETENCE_LABEL[c.type]}`;
+    cell.note = `${c.name} — ${competenceName(data, c.type)}`;
   });
-  ws.getCell(hr, colT).value = { formula: `SUM(${L(C1)}${hr}:${L(CN)}${hr})`, result: mt };
+  // umumiy maksimal ball (faol mezonlar)
+  ws.getCell(hr, colT).value = {
+    formula: activeCols.length === criteria.length ? `SUM(${L(C1)}${hr}:${L(CN)}${hr})` : sumCells(activeCols, `$${hr}`).replace(/\$(\d)/g, '$1'),
+    result: cls.maxTotal,
+  };
   ws.getCell(hr, colP).value = 'Foiz  %';
-  for (const k of COMPETENCES) ws.getCell(hr, colComp[k]).value = COMPETENCE_LABEL[k];
+  for (const k of compDefs) ws.getCell(hr, colComp[k.id]).value = k.name;
 
-  // --- O'quvchilar ---
+  // --- O'quvchilar: foiz = ball / maksimal ball ---
   students.forEach((s, i) => {
     const row = ds + i;
-    const res = computeStudent(criteria, s);
-    const blank = (v: number) => (res.participated ? v : '') as unknown as number;
+    const res = computeStudent(active, s, compIds);
     ws.getCell(row, 1).value = i + 1;
     ws.getCell(row, 2).value = s.name;
     criteria.forEach((c, j) => {
@@ -138,45 +147,44 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
       ws.getCell(row, C1 + j).value = isScore(v) ? v : null;
     });
     const range = `${L(C1)}${row}:${L(CN)}${row}`;
-    ws.getCell(row, colT).value = { formula: `IF(COUNT(${range})=0,"",SUM(${range}))`, result: blank(res.total) };
-    const rm = `SUMPRODUCT(--(${range}<>""),${L(C1)}$${hr}:${L(CN)}$${hr})`;
-    ws.getCell(row, colP).value = {
-      formula: `IF(${T}${row}="","",IF(${rm}=0,0,MIN(1,${T}${row}/${rm})))`,
-      result: blank(res.percent / 100),
-    };
-    for (const k of COMPETENCES) {
+    // jami ball
+    ws.getCell(row, colT).value = { formula: `SUM(${range})`, result: res.total };
+    // foiz = o'quvchi bali / maksimal ball
+    ws.getCell(row, colP).value = { formula: `${T}${row}/${T}$${hr}`, result: res.percent / 100 };
+    for (const k of compIds) {
       const cc = compCols(k);
-      const formula = cc.length
-        ? `IF(${T}${row}="","",IF((${rowMaxExpr(cc, row)})=0,0,MIN(1,SUM(${cc.map((x) => `${L(x)}${row}`).join(',')})/(${rowMaxExpr(cc, row)}))))`
-        : `IF(${T}${row}="","",0)`;
-      ws.getCell(row, colComp[k]).value = { formula, result: blank(res.comp[k] / 100) };
+      // kompetensiya foizi = shu mezon(lar) bali / maksimal bali
+      ws.getCell(row, colComp[k]).value = cc.length
+        ? { formula: `${grp(sumCells(cc, row))}/${grp(sumCells(cc, `$${hr}`))}`, result: res.comp[k] / 100 }
+        : 0;
     }
   });
 
-  // --- Jami va Foizi % ---
+  // --- Jami va Foizi %: sinf bali / (maksimal ball × o'quvchilar soni) ---
   ws.getCell(jr, 2).value = 'Jami';
   ws.getCell(fr, 2).value = 'Foizi %';
-  const pctFormula = (sumRef: string, cols: number[]) => `IF((${classMaxExpr(cols)})=0,0,MIN(1,${sumRef}/(${classMaxExpr(cols)})))`;
   criteria.forEach((c, i) => {
     const X = L(C1 + i);
     ws.getCell(jr, C1 + i).value = { formula: `SUM(${X}${ds}:${X}${de})`, result: cls.criterionSum[c.id] };
-    ws.getCell(fr, C1 + i).value = { formula: pctFormula(`${X}${jr}`, [C1 + i]), result: cls.criterionPercent[c.id] / 100 };
+    ws.getCell(fr, C1 + i).value = activeIds.has(c.id)
+      ? { formula: `IFERROR(${X}${jr}/(${X}$${hr}*${cnt}),0)`, result: cls.criterionPercent[c.id] / 100 }
+      : 0;
   });
   ws.getCell(jr, colT).value = { formula: `SUM(${T}${ds}:${T}${de})`, result: cls.totalSum };
-  ws.getCell(fr, colT).value = { formula: pctFormula(`${T}${jr}`, allCols), result: cls.percent / 100 };
+  ws.getCell(fr, colT).value = { formula: `IFERROR(${T}${jr}/(${T}$${hr}*${cnt}),0)`, result: cls.percent / 100 };
   ws.mergeCells(fr, colT, fr, colP); // umumiy foiz "jami" va "Foiz %" ustunlari ostida
-  for (const k of COMPETENCES) {
+  for (const k of compIds) {
     const col = colComp[k];
     const cc = compCols(k);
     // Jami qatorida — shu kompetensiya bo'yicha to'plangan ballar yig'indisi
-    ws.getCell(jr, col).value = cc.length ? { formula: cc.map((x) => `${L(x)}${jr}`).join('+'), result: cls.compSum[k] } : 0;
+    ws.getCell(jr, col).value = cc.length ? { formula: sumCells(cc, jr), result: cls.compSum[k] } : 0;
     ws.getCell(fr, col).value = cc.length
-      ? { formula: pctFormula(`${L(col)}${jr}`, cc), result: cls.compPercent[k] / 100 }
+      ? { formula: `IFERROR(${L(col)}${jr}/(${grp(sumCells(cc, `$${hr}`))}*${cnt}),0)`, result: cls.compPercent[k] / 100 }
       : 0;
   }
 
   // --- Formatlash ---
-  const isPctCol = (col: number) => col === colP || COMPETENCES.some((k) => colComp[k] === col);
+  const isPctCol = (col: number) => col === colP || compIds.some((k) => colComp[k] === col);
   for (let row = hr; row <= fr; row++) {
     for (let col = 1; col <= lastCol; col++) {
       const cell = ws.getCell(row, col);
@@ -205,7 +213,7 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
   for (let i = 0; i < n; i++) ws.getColumn(C1 + i).width = 9;
   ws.getColumn(colT).width = 9;
   ws.getColumn(colP).width = 10;
-  for (const k of COMPETENCES) ws.getColumn(colComp[k]).width = k === 'mulohaza' ? 15 : 11;
+  for (const k of compDefs) ws.getColumn(colComp[k.id]).width = Math.min(22, Math.max(11, k.name.length + 4));
 
   // --- Imzolar ---
   const sig = (row: number, text: string) => {
@@ -225,6 +233,7 @@ export async function buildReportWorkbook(meta: ReportMeta, data: ReportData): P
   metaWs.getCell('A1').value = JSON.stringify({
     app: 'EduAnalyze', version: 2, meta,
     criteria: criteria.map((c) => ({ id: c.id, name: c.name, max: c.max, type: c.type })),
+    competences: compDefs,
     studentIds: students.map((s) => s.id),
   });
   return wb;
@@ -298,7 +307,7 @@ export async function parseReportXlsx(buffer: ArrayBuffer): Promise<ParsedReport
     throw new Error('Faylni o‘qib bo‘lmadi. Iltimos, .xlsx formatidagi faylni tanlang');
   }
   const warnings: string[] = [];
-  let stored: { meta?: ReportMeta; criteria?: Criterion[]; studentIds?: string[] } = {};
+  let stored: { meta?: ReportMeta; criteria?: Criterion[]; studentIds?: string[]; competences?: CompetenceDef[] } = {};
   const metaWs = wb.getWorksheet(META_SHEET);
   if (metaWs) {
     try { stored = JSON.parse(cellText(metaWs.getCell('A1').value)); } catch { /* ignore */ }
@@ -315,6 +324,7 @@ export async function parseReportXlsx(buffer: ArrayBuffer): Promise<ParsedReport
 
   const criteria: Criterion[] = [];
   let dataStart: number;
+  let competences: CompetenceDef[] | undefined;
   const firstHeader = cellText(ws.getCell(hr, 3).value).trim();
   const legacy = firstHeader !== '' && Number.isNaN(Number(firstHeader.replace(',', '.')));
 
@@ -337,6 +347,21 @@ export async function parseReportXlsx(buffer: ArrayBuffer): Promise<ParsedReport
     }
     if (!foizCol || foizCol < 5) throw new Error('“Foiz %” ustuni topilmadi');
     const nCrit = foizCol - 4; // C .. (jami ustunidan oldingi)
+    // "Foiz %" dan keyingi ustunlar — kompetensiyalar (nomlari foydalanuvchi o'zgartirgan bo'lishi mumkin)
+    const compNames: string[] = [];
+    for (let col = foizCol + 1; col <= ws.columnCount; col++) {
+      const t = cellText(ws.getCell(hr, col).value).trim();
+      if (!t) break;
+      compNames.push(t);
+    }
+    competences = compNames.map((name, i) => {
+      const prevDef = stored.competences?.length === compNames.length ? stored.competences[i] : undefined;
+      return { id: prevDef?.id ?? toCompetence(name) ?? uid('k'), name };
+    });
+    const seenComp = new Set<string>();
+    for (const k of competences) { if (seenComp.has(k.id)) k.id = uid('k'); seenComp.add(k.id); }
+    const compIdSet = new Set(competences.map((k) => k.id));
+    const byName = (n: string) => competences!.find((k) => k.name.toLowerCase() === n.trim().toLowerCase())?.id ?? null;
     for (let i = 0; i < nCrit; i++) {
       const cell = ws.getCell(hr, 3 + i);
       const max = cellNumber(cell.value);
@@ -344,11 +369,13 @@ export async function parseReportXlsx(buffer: ArrayBuffer): Promise<ParsedReport
       const prev = stored.criteria?.length === nCrit ? stored.criteria[i] : undefined;
       const note = noteText(cell);
       const [noteName, noteType] = note.split(' — ');
-      let type: Competence | null = prev?.type ?? toCompetence(noteType || '');
-      if (!type && nCrit === 3) type = COMPETENCES[i]; // namunadagi kabi: 1-Bilish, 2-Qo‘llash, 3-Mulohaza
-      criteria.push({ id: prev?.id ?? '', name: prev?.name ?? (noteName?.trim() || `${i + 1}-topshiriq`), max, type: type || 'bilish' });
+      let type: Competence | null = prev?.type !== undefined && (compIdSet.has(prev.type) || prev.type === '') ? prev.type : null;
+      if (type === null && noteType) type = byName(noteType) ?? (compIdSet.has(toCompetence(noteType) || '') ? toCompetence(noteType) : null);
+      // namunadagi kabi: mezonlar soni kompetensiyalar soniga teng bo'lsa — tartib bo'yicha (1-Bilish, 2-Qo‘llash, 3-Mulohaza)
+      if (type === null && nCrit === competences.length) type = competences[i].id;
+      criteria.push({ id: prev?.id ?? '', name: prev?.name ?? (noteName?.trim() || `${i + 1}-topshiriq`), max, type: type ?? (competences[0]?.id || '') });
     }
-    if (!stored.criteria && nCrit !== 3 && !criteria.some((_c, i) => noteText(ws.getCell(hr, 3 + i)))) {
+    if (!stored.criteria && nCrit !== competences.length && !criteria.some((_c, i) => noteText(ws.getCell(hr, 3 + i)))) {
       warnings.push('Mezonlarning kompetensiya turi fayldan aniqlanmadi — “Mezonlar” bo‘limida tekshiring');
     }
     dataStart = hr + 1;
@@ -406,5 +433,5 @@ export async function parseReportXlsx(buffer: ArrayBuffer): Promise<ParsedReport
     if (m) meta.teacherName = m[1].trim();
   }
   if (meta.controlType && !CONTROL_TYPES.includes(meta.controlType)) delete meta.controlType;
-  return { meta, data: { criteria, students }, warnings };
+  return { meta, data: competences ? { criteria, students, competences } : { criteria, students }, warnings };
 }

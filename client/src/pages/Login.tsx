@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { BarChart3, CheckCircle2, Lock, School, User, UserRound } from 'lucide-react';
+import { BarChart3, Lock, School, User, UserRound } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '../components/ui';
 import { api } from '../lib/api';
@@ -56,33 +56,16 @@ export default function Login() {
   };
 
   return (
-    <div className="grid min-h-full lg:grid-cols-2">
-      <div className="hidden flex-col justify-between bg-navy-900 p-12 text-white lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
-            <BarChart3 className="size-5" />
+    // Oddiy, toza kirish sahifasi: o'rtada bitta karta — logotip tepada, forma ostida (logotip ustiga hech narsa tushmaydi)
+    <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
+      <form onSubmit={submit} className="w-full max-w-sm" noValidate>
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-navy-900 text-white shadow-sm">
+            <BarChart3 className="size-6" />
           </div>
-          <span className="text-lg font-semibold">EduAnalyze</span>
+          <div className="text-xl font-semibold leading-none tracking-tight text-slate-900">EduAnalyze</div>
         </div>
-        <div className="max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight">BSB va CHSB tahlillarini daqiqalar ichida tayyorlang</h2>
-          <p className="mt-4 text-navy-200">Ballarni kiriting — umumiy ball, foizlar va kompetensiyalar bo‘yicha natijalar avtomatik hisoblanadi. Rasmiy Excel hisobot bir tugma bilan tayyor.</p>
-          <ul className="mt-8 space-y-3 text-sm text-navy-100">
-            {['Excel’dan o‘quvchilar ro‘yxatini import qilish', 'Sayt ichida Excel kabi tahrirlash', 'Haqiqiy formulali .xlsx hisobot', 'Bilish, Qo‘llash, Mulohaza tahlili'].map((t) => (
-              <li key={t} className="flex items-center gap-2.5"><CheckCircle2 className="size-4 text-emerald-400" />{t}</li>
-            ))}
-          </ul>
-        </div>
-        <p className="text-xs text-navy-300">© {new Date().getFullYear()} EduAnalyze</p>
-      </div>
-
-      <div className="flex items-center justify-center p-6">
-        <form onSubmit={submit} className="w-full max-w-sm" noValidate>
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-navy-900 text-white"><BarChart3 className="size-5" /></div>
-            <span className="text-lg font-semibold">EduAnalyze</span>
-          </div>
-
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
           {allowRegister && (
             <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium">
               {(['login', 'register'] as const).map((m) => (
@@ -125,8 +108,8 @@ export default function Login() {
                 ? <>Hisobingiz yo‘qmi? <button type="button" className="font-medium text-navy-700 hover:underline" onClick={() => switchMode('register')}>Ro‘yxatdan o‘ting</button></>
                 : <>Hisobingiz bormi? <button type="button" className="font-medium text-navy-700 hover:underline" onClick={() => switchMode('login')}>Kirish</button></>}
           </p>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }

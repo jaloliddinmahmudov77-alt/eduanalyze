@@ -1,5 +1,5 @@
 import { normalizeName, uid } from '../calc';
-import { COMPETENCES, type Competence, type ReportData } from '../types';
+import { getCompetences, type Competence, type ReportData } from '../types';
 import type { ColKind, ScanCell, ScanTable } from './types';
 
 /** AI/OCR natijasini tekshirish oynasi uchun model va uni asosiy jadvalga qo'llash. */
@@ -104,15 +104,23 @@ export function buildReview(pages: PageResult[], data: ReportData): ReviewState 
   const kinds = base.table.columns.map((c) => c.kind);
   const scoreCols = scoreIdx(kinds);
   const nScores = scoreCols.length;
+  const comps = getCompetences(data);
 
   const columns: ReviewColumn[] = base.table.columns.map((c, i) => {
     const k = scoreCols.indexOf(i);
     // maks. ballni boshqa sahifalardan ham olishga harakat
     const max = c.max ?? valid.map((p) => p.table.columns[i]?.max ?? null).find((m) => m !== null) ?? null;
+    // Avtomatik moslash (foydalanuvchidan so'ralmaydi):
+    //  - hisobotda mezonlar bo'lsa: k-ball ustuni -> k-mezon; ortiqcha ustunlar e'tiborsiz;
+    //  - hisobotda mezon yo'q bo'lsa: rasmdagi maks. ball bilan mezonlar avtomatik yaratiladi.
     let target = 'ignore';
     if (k >= 0) {
       const crit = data.criteria[k];
-      target = crit && (max === null || Math.abs(crit.max - max) < 1e-9) ? crit.id : 'new';
+      if (crit) {
+        target = crit.id;
+        if (max !== null && Math.abs(crit.max - max) > 1e-9)
+          warnings.push(`Rasmdagi ${k + 1}-ustun maks. bali (${max}) “${crit.name}” mezonidan (${crit.max}) farq qiladi — ballar shu mezonga yozildi`);
+      } else if (!data.criteria.length) target = 'new';
     }
     const numericLabel = /^\d+([.,]\d+)?$/.test(c.label) || /-ustun$/.test(c.label);
     return {
@@ -121,7 +129,8 @@ export function buildReview(pages: PageResult[], data: ReportData): ReviewState 
       kind: c.kind,
       target,
       newName: numericLabel ? `${k + 1}-topshiriq` : c.label,
-      newType: nScores === 3 && k >= 0 ? COMPETENCES[k] : 'bilish',
+      // hisobot kompetensiyalari tartibi bo'yicha (masalan, 3 ustun -> Bilish, Qo'llash, Mulohaza)
+      newType: k >= 0 && comps.length ? (nScores === comps.length ? comps[k].id : comps[0].id) : '',
     };
   });
 
@@ -203,15 +212,25 @@ export function unresolvedCount(st: ReviewState) {
   return n;
 }
 
-export interface ApplyResult { data: ReportData; added: number; updated: number; skippedCells: number }
+export interface ApplyResult { data: ReportData; added: number; updated: number; skippedCells: number; warnings: string[] }
 
 /** Tasdiqlangan natijani asosiy jadvalga qo'llash. Tekshirilmagan (belgili) kataklar bo'sh qoldiriladi. */
 export function applyReview(data: ReportData, st: ReviewState): ApplyResult {
+  const warnings: string[] = [];
+  // Maks. bali aniqlanmagan yangi ustun: so'ramaymiz — eng katta o'qilgan ball maksimal deb olinadi
+  st = { ...st, columns: st.columns.map((c, i) => {
+    if (c.target !== 'new' || (c.max && c.max > 0)) return c;
+    const vals = st.rows.filter((r) => r.include && !r.cells[i].flag).map((r) => r.cells[i].value).filter((v): v is number => v !== null);
+    const guess = vals.length ? Math.max(...vals) : 0;
+    if (guess > 0) {
+      warnings.push(`“${c.newName || c.label}” maksimal bali rasmdan aniqlanmadi — ${guess} deb olindi (Mezonlar bo‘limida o‘zgartirish mumkin)`);
+      return { ...c, max: guess };
+    }
+    warnings.push(`“${c.newName || c.label}” ustunida ball topilmadi — o‘tkazib yuborildi`);
+    return { ...c, target: 'ignore' };
+  }) };
   const used = st.columns.filter((c) => c.target !== 'ignore');
-  if (!used.length) throw new Error('Kamida bitta ustunni mezonga moslang');
-  for (const c of used) {
-    if (c.target === 'new' && (!c.max || c.max <= 0)) throw new Error(`“${c.newName || c.label}” ustuni uchun maksimal ballni kiriting`);
-  }
+  if (!used.length) throw new Error('Rasmdan ball ustunlari aniqlanmadi');
   const targets = used.filter((c) => c.target !== 'new').map((c) => c.target);
   if (new Set(targets).size !== targets.length) throw new Error('Ikki ustun bitta mezonga moslangan. Har bir mezonni faqat bitta ustunga tanlang');
 
@@ -246,7 +265,7 @@ export function applyReview(data: ReportData, st: ReviewState): ApplyResult {
       s!.scores[crit.id] = cell.value;
     });
   }
-  return { data: { criteria, students }, added, updated, skippedCells };
+  return { data: { ...data, criteria, students }, added, updated, skippedCells, warnings };
 }
 
 /** Server AI javobini ScanTable ko'rinishiga keltirish (noto'g'ri shakldagi javobdan himoya) */

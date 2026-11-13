@@ -260,6 +260,7 @@ export default function ReportEditor() {
               onApply={(res) => {
                 hist.set(res.data);
                 toast(`Jadvalga qo‘shildi: ${res.added} ta yangi, ${res.updated} ta mavjud o‘quvchi${res.skippedCells ? ` · ${res.skippedCells} ta tekshirilmagan katak bo‘sh qoldirildi` : ''}`);
+                res.warnings.forEach((w) => toast(w, 'info'));
                 setTab('grid');
               }}
             />

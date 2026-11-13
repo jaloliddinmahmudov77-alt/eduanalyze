@@ -18,12 +18,25 @@
 html, body, #root { height: 100%; }
 body { @apply bg-slate-50 text-slate-800 antialiased; font-feature-settings: "cv11", "ss01"; }
 
-.input {
-  @apply w-full h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400
-    focus:outline-none focus:border-navy-500 focus:ring-3 focus:ring-navy-100 disabled:bg-slate-100 disabled:text-slate-500;
+/* "components" qatlamida — shunda pl-9, h-8, text-center kabi utility klasslar ularni to'g'ri ustidan yoza oladi
+   (aks holda ikonkali maydonlarda matn ikonka ustiga tushib qoladi) */
+@layer components {
+  .input {
+    @apply w-full h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400
+      focus:outline-none focus:border-navy-500 focus:ring-3 focus:ring-navy-100 disabled:bg-slate-100 disabled:text-slate-500;
+  }
+  .label { @apply mb-1.5 block text-[13px] font-medium text-slate-700; }
+  .card { @apply rounded-xl border border-slate-200 bg-white; }
 }
-.label { @apply mb-1.5 block text-[13px] font-medium text-slate-700; }
-.card { @apply rounded-xl border border-slate-200 bg-white; }
+
+/* Brauzer avto-to'ldirgan maydon: fon rangini saqlash (ikonka ko'rinib tursin) */
+input.input:-webkit-autofill,
+input.input:-webkit-autofill:hover,
+input.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-slate-900);
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
+  transition: background-color 9999s ease-out 0s;
+}
 
 /* Excel-like grid */
 .grid-table { border-collapse: separate; border-spacing: 0; }

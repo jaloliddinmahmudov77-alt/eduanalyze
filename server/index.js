@@ -133,6 +133,19 @@ function sanitizeData(input) {
   const students = Array.isArray(input?.students) ? input.students : [];
   if (criteria.length > 60) throw new HttpError(400, 'Mezonlar soni juda ko‘p');
   if (students.length > 500) throw new HttpError(400, 'O‘quvchilar soni juda ko‘p');
+  // Kompetensiya ustunlari: berilmasa — standart uchta (Bilish, Qo'llash, Mulohaza)
+  let competences;
+  if (Array.isArray(input?.competences)) {
+    if (input.competences.length > 12) throw new HttpError(400, 'Kompetensiyalar soni juda ko‘p');
+    const seen = new Set();
+    competences = input.competences.map((k, i) => {
+      const id = str(k?.id, 40) || `k${i}`;
+      if (seen.has(id)) throw new HttpError(400, 'Kompetensiya identifikatori takrorlangan');
+      seen.add(id);
+      return { id, name: str(k?.name, 40) || `Kompetensiya ${i + 1}` };
+    });
+  }
+  const compIds = new Set(competences ? competences.map((k) => k.id) : COMPETENCES);
   const ids = new Set();
   const cleanCriteria = criteria.map((c, i) => {
     const id = str(c.id, 40) || `c${i}`;
@@ -140,7 +153,7 @@ function sanitizeData(input) {
     ids.add(id);
     const max = Number(c.max);
     if (!Number.isFinite(max) || max <= 0 || max > 1000) throw new HttpError(400, `"${str(c.name)}" mezonining maksimal bali noto‘g‘ri`);
-    const type = COMPETENCES.includes(c.type) ? c.type : 'bilish';
+    const type = compIds.has(c.type) ? c.type : c.type === '' ? '' : (competences ? '' : 'bilish');
     return { id, name: str(c.name, 120) || `Mezon ${i + 1}`, max, type };
   });
   const cleanStudents = students.map((s, i) => {
@@ -156,17 +169,23 @@ function sanitizeData(input) {
     }
     return { id: str(s?.id, 40) || `s${i}`, name: str(s?.name, 160), scores };
   });
-  return { criteria: cleanCriteria, students: cleanStudents };
+  return competences ? { criteria: cleanCriteria, students: cleanStudents, competences } : { criteria: cleanCriteria, students: cleanStudents };
 }
 
-// Bo'sh katak = baholanmagan (hisobga kirmaydi); foiz faqat ball kiritilgan mezonlar bo'yicha
+// Sinf foizi = qatnashganlar ballari / (faol mezonlar maks. bali × qatnashganlar soni) — Excel bilan bir xil
 function classPercent(data) {
-  let got = 0, max = 0;
-  for (const s of data.students) for (const c of data.criteria) {
-    const v = s.scores[c.id];
-    if (typeof v === 'number') { got += v; max += c.max; }
+  const scored = (s, c) => typeof s.scores[c.id] === 'number';
+  let active = data.criteria.filter((c) => data.students.some((s) => scored(s, c)));
+  if (!active.length) active = data.criteria;
+  const max = active.reduce((a, c) => a + c.max, 0);
+  let got = 0, n = 0;
+  for (const s of data.students) {
+    const total = active.reduce((acc, c) => acc + (scored(s, c) ? s.scores[c.id] : 0), 0);
+    if (total <= 0) continue; // Excel: COUNTIF(jami, ">0")
+    n++;
+    got += total;
   }
-  return max ? Math.min(100, (got * 100) / max) : 0;
+  return n && max ? Math.min(100, (got * 100) / (max * n)) : 0;
 }
 
 // Ishga tushganda saqlangan sinf foizlarini joriy qoida bo'yicha yangilash

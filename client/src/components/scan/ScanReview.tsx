@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { parseScore } from '../../lib/calc';
 import { applyReview, unresolvedCount, validateRows, type ApplyResult, type ReviewState } from '../../lib/scan/review';
 import type { ColKind, ScanPage } from '../../lib/scan/types';
-import { COMPETENCES, COMPETENCE_LABEL, type Competence, type ReportData } from '../../lib/types';
+import { competenceName, getCompetences, type Competence, type ReportData } from '../../lib/types';
 import { useFeedback } from '../feedback';
 import { Badge, Button } from '../ui';
 
@@ -93,12 +93,15 @@ export function ScanReview({ pages, review, setReview, data, onApply, onBack }: 
           </div>
         )}
 
-        {/* Ustunlarni moslashtirish */}
-        <div className="card overflow-hidden">
-          <div className="border-b border-slate-200 px-4 py-2.5">
-            <h3 className="text-sm font-semibold text-slate-900">Ustunlarni moslashtirish</h3>
-            <p className="text-xs text-slate-500">Rasmdagi har bir ustun platformadagi qaysi mezonga tegishli? Umumiy ball va foizlar platformada qayta hisoblanadi.</p>
-          </div>
+        {/* Ustunlar avtomatik moslanadi; kerak bo'lsagina ochib o'zgartiriladi */}
+        <details className="card group overflow-hidden">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm">
+            <span className="font-semibold text-slate-900">Ustunlar avtomatik moslandi</span>
+            <span className="text-xs text-slate-500">
+              {used.length} ta ustun → {data.criteria.length ? 'hisobotdagi mezonlar' : 'rasmdagi maks. ballar bilan mezonlar yaratiladi'}
+            </span>
+            <span className="ml-auto text-xs font-medium text-navy-700 group-open:hidden">O‘zgartirish</span>
+          </summary>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-slate-50 text-left text-xs text-slate-500">
@@ -120,7 +123,7 @@ export function ScanReview({ pages, review, setReview, data, onApply, onBack }: 
                             if (cr) col.max = cr.max;
                           })}>
                           <option value="ignore">— E’tiborsiz qoldirish —</option>
-                          <option value="new">+ Yangi mezon</option>
+                          {(!data.criteria.length || c.target === 'new') && <option value="new">Yangi mezon (avtomatik)</option>}
                           {data.criteria.map((cr) => <option key={cr.id} value={cr.id}>{cr.name} (max {cr.max})</option>)}
                         </select>
                       </td>
@@ -138,10 +141,10 @@ export function ScanReview({ pages, review, setReview, data, onApply, onBack }: 
                       <td className="px-3 py-1.5">
                         {c.target === 'new' && (
                           <select className="input h-8 text-[13px]" value={c.newType} onChange={(e) => mutate((r) => { r.columns[i].newType = e.target.value as Competence; })}>
-                            {COMPETENCES.map((k) => <option key={k} value={k}>{COMPETENCE_LABEL[k]}</option>)}
+                            {getCompetences(data).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                           </select>
                         )}
-                        {crit && <span className="text-xs">{COMPETENCE_LABEL[crit.type]}</span>}
+                        {crit && <span className="text-xs">{competenceName(data, crit.type)}</span>}
                       </td>
                     </tr>
                   );
@@ -149,7 +152,7 @@ export function ScanReview({ pages, review, setReview, data, onApply, onBack }: 
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
 
         {/* Aniqlangan qatorlar */}
         <div className="card overflow-hidden">

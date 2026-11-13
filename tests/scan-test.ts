@@ -72,6 +72,21 @@ rv.columns[0].target = c2.id; rv.columns[1].target = c2.id;
 try { applyReview(res.data, rv); } catch (e) { threw = (e as Error).message; }
 ok(threw.includes('bitta mezonga'), 'ikki ustun bitta mezonga moslanmaydi');
 
+{
+  // Yangi mezon so'ralmaydi: mavjud mezonlar bo'lsa ortiqcha ustun e'tiborsiz, maks. bal yo'q bo'lsa avtomatik
+  const extra: ScanTable = { engine: 'ocr', columns: [...cols.slice(0, 2), { label: '10', max: 10, kind: 'score' }, cols[2]], rows: [
+    { index: 1, name: 'Aliyev Ali', nameConfidence: 0.95, cells: [cell(6), cell(14), cell(9), cell(29)] }] };
+  const rvx = buildReview([{ page: 1, table: extra }], res.data);
+  ok(rvx.columns.map((c) => c.target).join() === `${c1.id},${c2.id},ignore,ignore`, 'mavjud mezonlar bor — ortiqcha ustun yangi mezon bo‘lmaydi');
+  ok(!rvx.columns.some((c) => c.target === 'new'), 'yangi mezon taklif qilinmadi');
+  const noMax: ScanTable = { engine: 'ocr', columns: [{ label: '1-ustun', max: null, kind: 'score' }, { label: '2-ustun', max: 20, kind: 'score' }], rows: [
+    { index: 1, name: 'Ali', nameConfidence: 0.95, cells: [cell(7), cell(15)] }, { index: 2, name: 'Vali', nameConfidence: 0.95, cells: [cell(9), cell(18)] }] };
+  const rvn = buildReview([{ page: 1, table: noMax }], empty);
+  const resn = applyReview(empty, rvn);
+  ok(resn.data.criteria.length === 2 && resn.data.criteria[0].max === 9 && resn.data.criteria[1].max === 20, 'maks. bal yo‘q bo‘lsa so‘ralmaydi — avtomatik olinadi');
+  ok(resn.warnings.some((w) => w.includes('9 deb olindi')), 'bu haqda ogohlantirish beriladi');
+}
+
 console.log('4) AI natijasi va solishtirish');
 const aiRaw = { columns: [{ label: '6', max: 6, kind: 'score' }, { label: '28', max: 28, kind: 'score' }, { label: 'x', kind: 'weird' }],
   rows: [{ name: 'Aliyev Ali', cells: [{ value: 6, raw: '6', confidence: 0.98 }, { value: 18, raw: '18', confidence: 0.9 }] },

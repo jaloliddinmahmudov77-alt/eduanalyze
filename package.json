@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs && concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs && concurrently -k -n lib,api,web -c gray,blue,green \"npm:dev:lib\" \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --watch server/index.js",
     "dev:web": "vite --config client/vite.config.ts",
     "build": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs && tsc -p client/tsconfig.json --noEmit && vite build --config client/vite.config.ts",
@@ -16,7 +16,8 @@
     "test:scan": "tsx tests/scan-test.ts",
     "test:billing": "node scripts/build-server-lib.mjs && tsx tests/billing-test.ts",
     "db:migrate": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/migrate-to-supabase.mjs",
-    "user:password": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/set-password.mjs"
+    "user:password": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/set-password.mjs",
+    "dev:lib": "node scripts/build-server-lib.mjs --watch"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

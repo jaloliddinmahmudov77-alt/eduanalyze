@@ -1,5 +1,5 @@
 import { isScore, normalizeName, uid } from './calc';
-import { COMPETENCE_LABEL, type Competence, type Criterion, type ReportData, type Student } from './types';
+import { COMPETENCE_LABEL, getCompetences, type Competence, type CompetenceDef, type Criterion, type ReportData, type Student } from './types';
 
 /** Ma'lumotlar ustidagi o'zgarmas (immutable) amallar. Xatolikda Error tashlanadi. */
 
@@ -62,6 +62,7 @@ export function addCriterion(d: ReportData, c?: Partial<Criterion>, at = d.crite
 
 export function removeCriteria(d: ReportData, ids: Set<string>): ReportData {
   return {
+    ...d,
     criteria: d.criteria.filter((c) => !ids.has(c.id)),
     students: d.students.map((s) => {
       const scores = { ...s.scores };
@@ -100,4 +101,36 @@ export function parseCompetence(t: string): Competence | null {
   if (s.startsWith('qo')) return 'qollash';
   if (s.startsWith('mul')) return 'mulohaza';
   return null;
+}
+
+// ---------- kompetensiya ustunlari (Bilish, Qo'llash, Mulohaza ...) ----------
+
+/** Yangi kompetensiya ustuni qo'shish (at — joylashadigan o'rin) */
+export function addCompetence(d: ReportData, name = 'Yangi kompetensiya', at?: number): ReportData {
+  const list = [...getCompetences(d)];
+  const def: CompetenceDef = { id: uid('k'), name: name.trim().slice(0, 40) || 'Yangi kompetensiya' };
+  list.splice(at ?? list.length, 0, def);
+  return { ...d, competences: list };
+}
+
+export function renameCompetence(d: ReportData, id: string, name: string): ReportData {
+  return { ...d, competences: getCompetences(d).map((c) => (c.id === id ? { ...c, name: name.slice(0, 40) } : c)) };
+}
+
+export function moveCompetence(d: ReportData, id: string, dir: -1 | 1): ReportData {
+  const list = [...getCompetences(d)];
+  const i = list.findIndex((c) => c.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return d;
+  [list[i], list[j]] = [list[j], list[i]];
+  return { ...d, competences: list };
+}
+
+/** Kompetensiyani o'chirish: unga biriktirilgan mezonlar hech qaysi kompetensiyaga hisoblanmaydi (keyin boshqasiga biriktirish mumkin) */
+export function removeCompetence(d: ReportData, id: string): ReportData {
+  return {
+    ...d,
+    competences: getCompetences(d).filter((c) => c.id !== id),
+    criteria: d.criteria.map((c) => (c.type === id ? { ...c, type: '' } : c)),
+  };
 }
