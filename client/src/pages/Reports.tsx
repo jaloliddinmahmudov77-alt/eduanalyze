@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth';
 import { fmtPct } from '../lib/calc';
 import { groupLabel, parseReportXlsx } from '../lib/excel';
 import type { ReportMeta, ReportSummary, User } from '../lib/types';
-import { downloadReport, pickMeta } from './ReportEditor';
+import { usePaidDownload } from '../components/PaymentDialog';
 
 const filters = [
   { id: '', label: 'Barchasi' },
@@ -40,12 +40,12 @@ export default function Reports() {
   }, [type, q, owner]);
   useEffect(() => { if (isAdmin) api.users().then((r) => setTeachers(r.users)).catch(() => {}); }, [isAdmin]);
 
+  const paid = usePaidDownload();
   const download = async (r: ReportSummary) => {
     setBusyId(r.id);
     try {
-      const { report } = await api.getReport(r.id);
-      await downloadReport(pickMeta(report), report.data);
-    } catch (e) { toast((e as Error).message, 'error'); } finally { setBusyId(null); }
+      await paid.download(r.id, `${r.className}${r.groupName ? ` (${groupLabel(r.groupName)})` : ''} · ${r.subject} · ${r.controlType}`);
+    } finally { setBusyId(null); }
   };
   const duplicate = async (r: ReportSummary) => {
     try { await api.duplicateReport(r.id); toast('Nusxa yaratildi'); load(); } catch (e) { toast((e as Error).message, 'error'); }
@@ -69,6 +69,7 @@ export default function Reports() {
 
   return (
     <Page wide>
+      {paid.dialog}
       <PageHeader
         title={isAdmin ? 'Barcha hisobotlar' : 'Hisobotlar'}
         subtitle="Saqlangan BSB va CHSB hisobotlari — ochish, tahrirlash, nusxa olish va Excel’ga yuklab olish"

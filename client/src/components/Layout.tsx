@@ -1,9 +1,10 @@
 import clsx from 'clsx';
 import {
-  BarChart3, FilePlus2, FileSpreadsheet, LayoutDashboard, LogOut, Menu, ScanLine, Settings, ShieldCheck, X,
+  BarChart3, FilePlus2, FileSpreadsheet, LayoutDashboard, LogOut, Menu, MessageCircle, ScanLine, Settings, ShieldCheck, X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 const nav = [
@@ -11,6 +12,7 @@ const nav = [
   { to: '/reports/new', label: 'Yangi hisobot', icon: FilePlus2 },
   { to: '/scan', label: 'AI Skaner', icon: ScanLine },
   { to: '/reports', label: 'Hisobotlar', icon: FileSpreadsheet, end: true },
+  { to: '/messages', label: 'Xabarlar', icon: MessageCircle },
   { to: '/settings', label: 'Sozlamalar', icon: Settings },
 ];
 
@@ -34,7 +36,18 @@ export default function Layout() {
   const loc = useLocation();
   useEffect(() => setOpen(false), [loc.pathname]);
 
-  const items = user?.role === 'admin' ? [...nav.slice(0, 4), { to: '/admin', label: 'Administrator', icon: ShieldCheck }, nav[4]] : nav;
+  // administrator javoblari: o'qilmaganlar soni (har 20 soniyada)
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const check = () => api.unreadMessages().then((r) => setUnread(r.unread)).catch(() => {});
+    check();
+    const t = setInterval(check, 20_000);
+    const onRead = () => setUnread(0);
+    window.addEventListener('eduanalyze:messages-read', onRead);
+    return () => { clearInterval(t); window.removeEventListener('eduanalyze:messages-read', onRead); };
+  }, []);
+
+  const items = user?.role === 'admin' ? [...nav.slice(0, 5), { to: '/admin', label: 'Administrator', icon: ShieldCheck }, nav[5]] : nav;
   const initials = (user?.fullName || '?').split(' ').slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
   const sidebar = (
@@ -60,6 +73,9 @@ export default function Layout() {
           >
             <it.icon className="size-[18px]" />
             {it.label}
+            {it.to === '/messages' && unread > 0 && (
+              <span className="ml-auto rounded-full bg-amber-400 px-1.5 text-[11px] font-semibold text-navy-950">{unread}</span>
+            )}
           </NavLink>
         ))}
       </nav>

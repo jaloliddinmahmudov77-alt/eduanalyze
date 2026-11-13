@@ -14,7 +14,8 @@ import { StudentsEditor } from '../components/StudentsEditor';
 import { Button, ControlBadge, PageLoader } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { downloadBlob, exportReportXlsx, groupLabel, parseReportXlsx, reportFileName } from '../lib/excel';
+import { groupLabel, parseReportXlsx } from '../lib/excel';
+import { usePaidDownload } from '../components/PaymentDialog';
 import type { Report, ReportData, ReportMeta } from '../lib/types';
 import { useHistory } from '../lib/useHistory';
 
@@ -35,10 +36,6 @@ export const pickMeta = (r: ReportMeta): ReportMeta => ({
   subject: r.subject, controlType: r.controlType, teacherName: r.teacherName,
 });
 
-export async function downloadReport(meta: ReportMeta, data: ReportData) {
-  const blob = await exportReportXlsx(meta, data);
-  downloadBlob(blob, reportFileName(meta));
-}
 
 export default function ReportEditor() {
   const { id } = useParams();
@@ -54,6 +51,7 @@ export default function ReportEditor() {
   const [save, setSave] = useState<SaveState>('saved');
   const [saveError, setSaveError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const paid = usePaidDownload();
   const lastSaved = useRef('');
   const fileRef = useRef<HTMLInputElement>(null);
   const data = hist.value;
@@ -141,9 +139,9 @@ export default function ReportEditor() {
     if (unnamed && !(await confirm({ title: 'Ismsiz qatorlar', text: `${unnamed} ta qatorda o‘quvchi ismi yozilmagan. Baribir yuklab olasizmi?`, confirmText: 'Yuklab olish' }))) return;
     setExporting(true);
     try {
-      await doSave();
-      await downloadReport(meta, data);
-      toast('Excel hisobot yuklab olindi');
+      // Excel serverda yaratiladi (to'lov tekshiruvi bilan) — avval oxirgi o'zgarishlarni saqlaymiz
+      if (!(await doSave())) throw new Error(saveError || 'Avval o‘zgarishlarni saqlang');
+      await paid.download(reportId, `${meta.className}${meta.groupName ? ` (${groupLabel(meta.groupName)})` : ''} · ${meta.subject} · ${meta.controlType}`);
     } catch (e) {
       toast((e as Error).message, 'error');
     } finally {
@@ -240,6 +238,7 @@ export default function ReportEditor() {
         </div>
       </div>
 
+      {paid.dialog}
       <input ref={fileRef} type="file" accept=".xlsx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importXlsx(f); e.target.value = ''; }} />
 
       {save === 'error' && saveError && (

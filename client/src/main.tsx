@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './lib/auth';
 import Admin from './pages/Admin';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import Messages from './pages/Messages';
 import NewReport from './pages/NewReport';
 import ReportEditor from './pages/ReportEditor';
 import Reports from './pages/Reports';
@@ -39,6 +40,7 @@ function App() {
         <Route path="reports/new" element={<NewReport />} />
         <Route path="reports/:id" element={<ReportEditorRoute />} />
         <Route path="scan" element={<ScanStart />} />
+        <Route path="messages" element={<Messages />} />
         <Route path="settings" element={<Settings />} />
         <Route path="admin" element={<AdminOnly><Admin /></AdminOnly>} />
         <Route path="*" element={<Navigate to="/" replace />} />

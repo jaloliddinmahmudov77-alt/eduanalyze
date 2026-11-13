@@ -63,6 +63,65 @@ Menyu: **AI Skaner** yoki hisobot ichidagi **AI Skaner** bo‘limi.
 
 **Kamera:** brauzer kamerani faqat `https://` yoki `localhost` da beradi. Telefonda tarmoq orqali ochganda HTTPS kerak; aks holda “Telefon kamerasi / galereyadan yuklash” tugmasi telefonning o‘z kamerasini ochadi.
 
+## Pullik yuklab olish va Telegram bot
+
+Har bir hisobotning rasmiy Excel faylini yuklab olish pullik (standart: **15 000 so‘m**). Excel **serverda** yaratiladi, shuning uchun to‘lovni brauzer orqali chetlab o‘tib bo‘lmaydi.
+
+1. O‘qituvchi “Excel yuklab olish” ni bosadi → oynada summa va karta raqami ko‘rinadi.
+2. Kartaga o‘tkazib, chek rasmini (yoki PDF) yuklaydi.
+3. Chek Telegram botga **✅ Tasdiqlash / ❌ Rad etish** tugmalari bilan keladi.
+4. Tasdiqlansa — fayl saytda avtomatik yuklab olinadi (keyingi 30 daqiqa ichida qayta yuklash mumkin). Rad etilsa — sabab ko‘rsatiladi va yangi chek yuborish mumkin.
+5. Bitta tasdiqlangan to‘lov = bitta yuklab olish. Sayt administratorlari bepul yuklaydi.
+
+**Bot faqat @Mahmudov567 uchun.** Shu profil botga birinchi marta `/start` yuborganda uning Telegram ID si bazaga bog‘lanadi; keyin faqat shu ID qabul qilinadi (username o‘zgartirilsa yoki boshqaga o‘tsa ham boshqa odam boshqara olmaydi). Boshqa profillarga “ruxsat yo‘q” javobi qaytadi.
+
+**❌ Rad etish** bosilganda bot admindan sababni so‘raydi; yozilgan sabab saytda to‘lov oynasida va **Xabarlar** bo‘limida foydalanuvchiga ko‘rinadi (`/skip` — sababsiz).
+
+**Xabarlar (suhbat).** Saytdagi **Xabarlar** bo‘limida foydalanuvchi administratorga yozadi → xabar botga “↩️ Javob berish” tugmasi bilan keladi. Admin tugmani bosib yoki xabarga Telegram’da **Reply** qilib javob yozadi → javob saytda foydalanuvchiga ko‘rinadi (o‘qilmaganlar soni menyuda). Suhbat har bir foydalanuvchi bilan yagona admin o‘rtasida.
+
+Bot admin paneli: `/stats` (statistika, tushum), `/pending` (kutilayotgan to‘lovlar), `/tolovlar`, `/users`, `/xabarlar`, `/sozlamalar`, `/narx 15000`, `/karta 8600123412341234 Ism Familiya`, `/sabab 12 matn`, `/bekor`. Yangi ro‘yxatdan o‘tganlar haqida xabar keladi. Saytdagi **Administrator → To‘lovlar** bo‘limida barcha to‘lovlar, tushum va cheklar ko‘rinadi.
+
+Sozlash (`.env`):
+```
+TELEGRAM_BOT_TOKEN=...            # @BotFather dan
+TELEGRAM_ADMIN_USERNAME=Mahmudov567
+```
+Bot long polling bilan ishlaydi — ommaviy URL yoki webhook kerak emas. Bir vaqtda faqat bitta server nusxasi botni ishlatishi kerak.
+
+## Supabase
+
+Server `SUPABASE_DB_URL` berilsa Supabase Postgres bilan, aks holda mahalliy SQLite bilan ishlaydi (kod bir xil). Ma’lumotlar Supabase loyihasidagi alohida **`eduanalyze`** sxemasida saqlanadi — loyihadagi boshqa jadvallarga tegilmaydi. Jadvallarda RLS yoqilgan va `anon`/`authenticated` rollariga ruxsat yo‘q: ma’lumotlarga faqat server kiradi.
+
+1. Supabase Dashboard → **Connect** → **Session pooler** ulanish satrini nusxalang va parolni qo‘ying.
+2. `.env`: `SUPABASE_DB_URL=postgresql://postgres.<ref>:<PAROL>@aws-0-<region>.pooler.supabase.com:5432/postgres`
+3. Mavjud ma’lumotlarni ko‘chirish: `npm run db:migrate`
+4. Serverni qayta ishga tushiring — logda `baza: Supabase Postgres` ko‘rinadi.
+
+## Serverga joylash (production)
+
+Talab: **Node.js 22.13+**, doimiy ishlaydigan server (VPS, Render, Railway, Fly.io va h.k.), HTTPS (kamera va xavfsiz kirish uchun). Bot long polling ishlatadi — **faqat bitta nusxa** ishga tushirilsin.
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production npm start        # port: EDU_PORT (standart 5174)
+```
+yoki Docker: `docker build -t eduanalyze . && docker run --env-file .env -p 8080:8080 eduanalyze`
+
+Muhit o‘zgaruvchilari (`.env` yoki hosting sozlamalari):
+
+| O‘zgaruvchi | Vazifasi |
+|---|---|
+| `NODE_ENV=production` | production rejimi (demo foydalanuvchi yaratilmaydi, standart parollar bloklanadi) |
+| `SUPABASE_DB_URL` | Supabase **Session pooler** satri (IPv4) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ADMIN_USERNAME` | to‘lov boti |
+| `GEMINI_API_KEY` (ixtiyoriy) | AI Skaner |
+| `EDU_PORT` | HTTP port |
+| `EDU_TRUST_PROXY=1` | Nginx/hosting proksi orqasida (haqiqiy IP — rate-limit uchun) |
+| `EDU_ADMIN_PASSWORD` | yangi bo‘sh bazada birinchi admin paroli |
+
+Xavfsizlik: production’da `admin123`/`teacher123` kabi standart parollar bilan kirish bloklanadi. Parolni almashtirish: `npm run user:password -- admin "YangiKuchliParol"`. Login’ga brute-force himoyasi (15 daqiqada 10 xato), xavfsizlik sarlavhalari, `/api/health` (monitoring) va to‘g‘ri to‘xtash (SIGTERM) mavjud.
+
 ## Hisob-kitob qoidalari
 
 - **Bo‘sh katak = baholanmagan**: na bali, na maksimal bali hisobga kiradi. **0 = nol ball** (hisobga kiradi).
@@ -81,6 +140,7 @@ npm test             # hisob-kitob, Excel eksport/import, o‘quvchilarni aniqla
 npm run test:excel   # haqiqiy Microsoft Excel’da formulalarni tekshirish (Windows + Excel kerak)
 npm run test:ocr     # OCR: haqiqiy screenshot (tests/fixtures/sample-11B.png, shaxsiy — repozitoriyda yo‘q) dan jadvalni o‘qish
 npm run test:scan    # skaner mantiqi: ko‘p sahifa, takrorlar, AI/OCR solishtirish, qo‘llash, backend AI (mock Gemini)
+npm run test:billing # pullik yuklash + Telegram bot (soxta Telegram), SQLite va Postgres’da
 ```
 
 ## Tuzilma

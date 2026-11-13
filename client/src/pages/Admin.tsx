@@ -1,20 +1,22 @@
 import clsx from 'clsx';
-import { BookOpen, KeyRound, Pencil, Plus, School, Trash2, UserPlus, Users } from 'lucide-react';
+import { BookOpen, KeyRound, Pencil, Plus, School, Trash2, UserPlus, Users, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFeedback } from '../components/feedback';
 import { Page } from '../components/Layout';
+import { PaymentsPanel } from '../components/PaymentsPanel';
 import { Badge, Button, Field, Modal, PageHeader, PageLoader, formatDate } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import type { CatalogItem, User } from '../lib/types';
 
-type Tab = 'users' | 'class' | 'subject';
+type Tab = 'users' | 'payments' | 'class' | 'subject';
 
 export default function Admin() {
   const [tab, setTab] = useState<Tab>('users');
   const tabs = [
     { id: 'users' as const, label: 'O‘qituvchilar', icon: Users },
+    { id: 'payments' as const, label: 'To‘lovlar', icon: Wallet },
     { id: 'class' as const, label: 'Sinflar', icon: School },
     { id: 'subject' as const, label: 'Fanlar', icon: BookOpen },
   ];
@@ -29,7 +31,7 @@ export default function Admin() {
           </button>
         ))}
       </div>
-      {tab === 'users' ? <UsersPanel /> : <CatalogPanel kind={tab} key={tab} />}
+      {tab === 'users' ? <UsersPanel /> : tab === 'payments' ? <PaymentsPanel /> : <CatalogPanel kind={tab} key={tab} />}
     </Page>
   );
 }

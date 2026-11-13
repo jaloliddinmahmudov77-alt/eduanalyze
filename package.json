@@ -4,16 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/copy-ocr-assets.mjs && concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs && concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --watch server/index.js",
     "dev:web": "vite --config client/vite.config.ts",
-    "build": "node scripts/copy-ocr-assets.mjs && tsc -p client/tsconfig.json --noEmit && vite build --config client/vite.config.ts",
-    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning server/index.js",
+    "build": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs && tsc -p client/tsconfig.json --noEmit && vite build --config client/vite.config.ts",
+    "start": "node scripts/build-server-lib.mjs && node --env-file-if-exists=.env --disable-warning=ExperimentalWarning server/index.js",
     "test": "tsx tests/run.ts",
     "test:excel": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/excel-verify.ps1",
-    "postinstall": "node scripts/copy-ocr-assets.mjs",
+    "postinstall": "node scripts/copy-ocr-assets.mjs && node scripts/build-server-lib.mjs",
     "test:ocr": "tsx tests/ocr-test.ts",
-    "test:scan": "tsx tests/scan-test.ts"
+    "test:scan": "tsx tests/scan-test.ts",
+    "test:billing": "node scripts/build-server-lib.mjs && tsx tests/billing-test.ts",
+    "db:migrate": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/migrate-to-supabase.mjs",
+    "user:password": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/set-password.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
@@ -21,10 +24,12 @@
     "@tesseract.js-data/uzb": "^1.0.0",
     "@tesseract.js-data/uzb_cyrl": "^1.0.0",
     "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
     "exceljs": "^4.4.0",
     "express": "^5.3.0",
     "lucide-react": "^1.72.0",
     "pdfjs-dist": "^6.5.438",
+    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5",
@@ -32,6 +37,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/pngjs": "^6.0.5",
@@ -44,5 +50,11 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "overrides": {
+    "uuid": "^11.1.0"
   }
 }

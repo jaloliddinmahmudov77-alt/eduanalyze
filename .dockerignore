@@ -1,0 +1,9 @@
+node_modules
+client/dist
+client/public/ocr
+server/data
+server/gen
+tests/out
+.env
+.git
+*.log

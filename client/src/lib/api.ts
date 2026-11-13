@@ -1,4 +1,4 @@
-import type { CatalogItem, Report, ReportData, ReportMeta, ReportSummary, User } from './types';
+import type { BillingConfig, CatalogItem, ChatMessage, Payment, PaymentState, Report, ReportData, ReportMeta, ReportSummary, User } from './types';
 
 const TOKEN_KEY = 'eduanalyze.token';
 
@@ -38,6 +38,43 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   return json as T;
 }
 
+/** Fayl (blob) qaytaradigan so'rov: 402 — to'lov kerak */
+export async function exportReportFile(id: number): Promise<{ blob: Blob; filename: string } | { paymentRequired: PaymentState }> {
+  const token = tokenStore.get();
+  let res: Response;
+  try {
+    res = await fetch(`/api/reports/${id}/export`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, 'Server bilan aloqa yo‘q. Internet yoki serverni tekshiring');
+  }
+  if (res.status === 402) {
+    const j = await res.json();
+    return { paymentRequired: { access: 'none', payment: j.payment, config: j.config } };
+  }
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    if (res.status === 401) onUnauthorized?.();
+    throw new ApiError(res.status, j.error || `Xatolik (${res.status})`);
+  }
+  const cd = res.headers.get('content-disposition') || '';
+  const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+  return { blob: await res.blob(), filename: m ? decodeURIComponent(m[1]) : 'hisobot.xlsx' };
+}
+
+export async function fetchReceipt(paymentId: number): Promise<Blob> {
+  const res = await fetch(`/api/admin/payments/${paymentId}/receipt`, { headers: { Authorization: `Bearer ${tokenStore.get()}` } });
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).error || 'Chek topilmadi');
+  return res.blob();
+}
+
+export interface AdminBilling {
+  config: BillingConfig;
+  bot: { enabled: boolean; running?: boolean; username: string; adminBound: boolean; adminUsername: string };
+  database: string;
+  stats: { pending: number; approved: number; used: number; rejected: number; revenue: number };
+  payments: Payment[];
+}
+
 export type ReportPayload = ReportMeta & { data: ReportData };
 
 export interface Stats {
@@ -55,6 +92,15 @@ export const api = {
   register: (u: { username: string; password: string; fullName: string; school: string }) =>
     request<{ token: string; user: User }>('POST', '/api/auth/register', u),
   authConfig: () => request<{ allowRegister: boolean }>('GET', '/api/auth/config'),
+  messages: () => request<{ messages: ChatMessage[]; adminOnline: boolean }>('GET', '/api/messages'),
+  unreadMessages: () => request<{ unread: number }>('GET', '/api/messages/unread'),
+  sendMessage: (text: string) => request<{ message: ChatMessage; delivered: boolean }>('POST', '/api/messages', { text }),
+  billingConfig: () => request<BillingConfig>('GET', '/api/billing/config'),
+  paymentState: (reportId: number) => request<PaymentState>('GET', `/api/reports/${reportId}/payment`),
+  createPayment: (reportId: number, receipt: string, mimeType: string) =>
+    request<{ payment: Payment; delivered: boolean }>('POST', '/api/payments', { reportId, receipt, mimeType }),
+  myPayments: () => request<{ payments: Payment[] }>('GET', '/api/payments/mine'),
+  adminBilling: () => request<AdminBilling>('GET', '/api/admin/billing'),
   aiStatus: () => request<{ gemini: boolean; model: string | null }>('GET', '/api/ai/status'),
   aiExtract: (image: string, mimeType: string) => request<{ result: unknown }>('POST', '/api/ai/extract', { image, mimeType }),
   me: () => request<{ user: User }>('GET', '/api/auth/me'),

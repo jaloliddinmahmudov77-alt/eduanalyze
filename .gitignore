@@ -8,3 +8,4 @@ client/public/ocr
 # haqiqiy o‘quvchilar ma’lumoti bor rasm — faqat mahalliy
 tests/fixtures/sample-11B.png
 tests/fixtures/sample-11B.expected.json
+server/gen
