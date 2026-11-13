@@ -1,0 +1,10 @@
+node_modules
+client/dist
+server/data
+*.log
+tests/out
+client/public/ocr
+.env
+# haqiqiy o‘quvchilar ma’lumoti bor rasm — faqat mahalliy
+tests/fixtures/sample-11B.png
+tests/fixtures/sample-11B.expected.json

@@ -1,0 +1,48 @@
+{
+  "name": "eduanalyze",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/copy-ocr-assets.mjs && concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning --watch server/index.js",
+    "dev:web": "vite --config client/vite.config.ts",
+    "build": "node scripts/copy-ocr-assets.mjs && tsc -p client/tsconfig.json --noEmit && vite build --config client/vite.config.ts",
+    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning server/index.js",
+    "test": "tsx tests/run.ts",
+    "test:excel": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/excel-verify.ps1",
+    "postinstall": "node scripts/copy-ocr-assets.mjs",
+    "test:ocr": "tsx tests/ocr-test.ts",
+    "test:scan": "tsx tests/scan-test.ts"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/rus": "^1.0.0",
+    "@tesseract.js-data/uzb": "^1.0.0",
+    "@tesseract.js-data/uzb_cyrl": "^1.0.0",
+    "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.3.0",
+    "lucide-react": "^1.72.0",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "pngjs": "^7.0.0",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
