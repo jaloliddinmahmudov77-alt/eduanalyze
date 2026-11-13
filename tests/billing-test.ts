@@ -76,7 +76,7 @@ async function runSuite(label: string, env: Record<string, string>, port: number
     const rep = (await (await post('/reports', { className: '6-A', subject: 'Ingliz tili', controlType: 'CHSB-I', data: { criteria: [{ id: 'a', name: 'L', max: 6, type: 'bilish' }], students: [{ id: 's', name: 'Ali', scores: { a: 5 } }] } }, teacher)).json()).report;
     let r = await post(`/reports/${rep.id}/export`, {}, teacher);
     const j402 = await r.json();
-    ok(r.status === 402 && j402.config.price === 15000, `to‘lovsiz yuklab bo‘lmaydi (402, 15 000) — ${r.status}`);
+    ok(r.status === 402 && j402.config.price === 5000, `to‘lovsiz yuklab bo‘lmaydi (402, 5 000) — ${r.status}`);
     r = await post(`/reports/${rep.id}/export`, {}, admin);
     ok(r.status === 200 && r.headers.get('x-download-mode') === 'free', 'sayt administratori bepul yuklaydi');
 
@@ -84,7 +84,7 @@ async function runSuite(label: string, env: Record<string, string>, port: number
     const receipt = Buffer.alloc(5000, 1).toString('base64');
     r = await post('/payments', { reportId: rep.id, receipt, mimeType: 'image/jpeg' }, teacher);
     const pay = (await r.json()).payment;
-    ok(r.status === 201 && pay.status === 'pending' && pay.amount === 15000, 'to‘lov so‘rovi yaratildi');
+    ok(r.status === 201 && pay.status === 'pending' && pay.amount === 5000, 'to‘lov so‘rovi yaratildi');
     const photo = calls.find((c) => c.method === 'sendPhoto');
     ok(photo && photo.raw.includes('777') && photo.raw.includes(`ap:${pay.id}`) && photo.raw.includes(`rj:${pay.id}`), 'chek adminga ✅/❌ tugmalari bilan yuborildi');
     ok((await post('/payments', { reportId: rep.id, receipt, mimeType: 'image/jpeg' }, teacher)).status === 409, 'ikkinchi chek kutilayotganda qabul qilinmaydi');
@@ -145,7 +145,7 @@ async function runSuite(label: string, env: Record<string, string>, port: number
 
     // 8) Sayt admin paneli
     const ab = await (await get('/admin/billing', admin)).json();
-    ok(ab.stats.used === 1 && ab.stats.pending === 1 && ab.stats.rejected === 1 && ab.stats.revenue === 15000, `sayt admin statistikasi ${JSON.stringify(ab.stats)}`);
+    ok(ab.stats.used === 1 && ab.stats.pending === 1 && ab.stats.rejected === 1 && ab.stats.revenue === 5000, `sayt admin statistikasi ${JSON.stringify(ab.stats)}`);
     ok(ab.bot.adminBound && ab.bot.username === 'EduAnalyzeBot', 'bot holati saytda');
     r = await get(`/admin/payments/${pay.id}/receipt`, admin);
     ok(r.status === 200 && (await r.arrayBuffer()).byteLength === 2000, 'chekni saytdan ko‘rish');

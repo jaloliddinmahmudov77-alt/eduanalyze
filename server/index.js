@@ -35,7 +35,7 @@ app.use((req, res, next) => (req.path.startsWith('/api/ai/') || req.path === '/a
 const CONTROL_TYPES = ['BSB-I', 'BSB-II', 'CHSB-I', 'CHSB-II'];
 const COMPETENCES = ['bilish', 'qollash', 'mulohaza'];
 const SESSION_DAYS = 30;
-const DEFAULT_PRICE = 15000;
+const DEFAULT_PRICE = 5000;
 const REDOWNLOAD_MINUTES = 30; // to'lovdan keyin qayta yuklab olish oynasi
 
 class HttpError extends Error {

@@ -170,7 +170,7 @@ const HELP = `<b>EduAnalyze admin panel</b>
 🧾 /tolovlar — oxirgi 15 ta to‘lov
 👥 /users — oxirgi foydalanuvchilar
 💳 /sozlamalar — narx va karta
-💰 /narx 15000 — bitta yuklash narxini o‘zgartirish
+💰 /narx 5000 — bitta yuklash narxini o‘zgartirish
 🏦 /karta 8600123412341234 Ism Familiya — to‘lov kartasini o‘zgartirish
 ✍️ /sabab 12 Chek noto‘g‘ri — rad etilgan to‘lovga sabab yozish
 💬 /xabarlar — foydalanuvchilardan kelgan oxirgi xabarlar
@@ -241,15 +241,15 @@ async function handleCommand(chatId, text) {
   }
 
   if (cmd === '/sozlamalar') {
-    const price = Number(await getSetting('price')) || 15000;
+    const price = Number(await getSetting('price')) || 5000;
     const card = (await getSetting('card_number')) || '—';
     const owner = (await getSetting('card_owner')) || '—';
-    return reply(`💳 <b>To‘lov sozlamalari</b>\n\n💰 Bitta yuklash: <b>${money(price)}</b>\n🏦 Karta: <code>${esc(card)}</code>\n👤 Egasi: ${esc(owner)}\n\nO‘zgartirish:\n/narx 15000\n/karta 8600123412341234 Ism Familiya`);
+    return reply(`💳 <b>To‘lov sozlamalari</b>\n\n💰 Bitta yuklash: <b>${money(price)}</b>\n🏦 Karta: <code>${esc(card)}</code>\n👤 Egasi: ${esc(owner)}\n\nO‘zgartirish:\n/narx 5000\n/karta 8600123412341234 Ism Familiya`);
   }
 
   if (cmd === '/narx') {
     const n = Number((rest[0] || '').replace(/\D/g, ''));
-    if (!n || n < 1000 || n > 10_000_000) return reply('Foydalanish: /narx 15000 (1 000 dan 10 000 000 so‘mgacha)');
+    if (!n || n < 1000 || n > 10_000_000) return reply('Foydalanish: /narx 5000 (1 000 dan 10 000 000 so‘mgacha)');
     await setSetting('price', String(n));
     return reply(`✅ Yangi narx: <b>${money(n)}</b>. Saytda darhol qo‘llandi.`);
   }

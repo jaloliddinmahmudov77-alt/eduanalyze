@@ -65,7 +65,7 @@ Menyu: **AI Skaner** yoki hisobot ichidagi **AI Skaner** bo‘limi.
 
 ## Pullik yuklab olish va Telegram bot
 
-Har bir hisobotning rasmiy Excel faylini yuklab olish pullik (standart: **15 000 so‘m**). Excel **serverda** yaratiladi, shuning uchun to‘lovni brauzer orqali chetlab o‘tib bo‘lmaydi.
+Har bir hisobotning rasmiy Excel faylini yuklab olish pullik (standart: **5 000 so‘m**; botda `/narx` bilan o‘zgartiriladi). Excel **serverda** yaratiladi, shuning uchun to‘lovni brauzer orqali chetlab o‘tib bo‘lmaydi.
 
 1. O‘qituvchi “Excel yuklab olish” ni bosadi → oynada summa va karta raqami ko‘rinadi.
 2. Kartaga o‘tkazib, chek rasmini (yoki PDF) yuklaydi.
@@ -79,7 +79,7 @@ Har bir hisobotning rasmiy Excel faylini yuklab olish pullik (standart: **15 000
 
 **Xabarlar (suhbat).** Saytdagi **Xabarlar** bo‘limida foydalanuvchi administratorga yozadi → xabar botga “↩️ Javob berish” tugmasi bilan keladi. Admin tugmani bosib yoki xabarga Telegram’da **Reply** qilib javob yozadi → javob saytda foydalanuvchiga ko‘rinadi (o‘qilmaganlar soni menyuda). Suhbat har bir foydalanuvchi bilan yagona admin o‘rtasida.
 
-Bot admin paneli: `/stats` (statistika, tushum), `/pending` (kutilayotgan to‘lovlar), `/tolovlar`, `/users`, `/xabarlar`, `/sozlamalar`, `/narx 15000`, `/karta 8600123412341234 Ism Familiya`, `/sabab 12 matn`, `/bekor`. Yangi ro‘yxatdan o‘tganlar haqida xabar keladi. Saytdagi **Administrator → To‘lovlar** bo‘limida barcha to‘lovlar, tushum va cheklar ko‘rinadi.
+Bot admin paneli: `/stats` (statistika, tushum), `/pending` (kutilayotgan to‘lovlar), `/tolovlar`, `/users`, `/xabarlar`, `/sozlamalar`, `/narx 5000`, `/karta 8600123412341234 Ism Familiya`, `/sabab 12 matn`, `/bekor`. Yangi ro‘yxatdan o‘tganlar haqida xabar keladi. Saytdagi **Administrator → To‘lovlar** bo‘limida barcha to‘lovlar, tushum va cheklar ko‘rinadi.
 
 Sozlash (`.env`):
 ```
